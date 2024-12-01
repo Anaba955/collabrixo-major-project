@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import "./globals.css";
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 import { ThemeProvider } from "@/components/providers/theme";
 
@@ -24,6 +25,8 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
+            <SpeedInsights />
+
           </ThemeProvider>
       </body>
     </html>
