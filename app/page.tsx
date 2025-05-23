@@ -20,13 +20,13 @@ export default function HomePage() {
           </p>
 
           {/* Buttons */}
-          <div className="flex justify-center gap-4 mt-6 relative z-10">
-            <Link href="/signup">
+          <div className=" flex justify-center gap-4 mt-6 relative z-10">
+            <Link href="/sign-up">
               <button className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 transition">
                 Get Started
               </button>
             </Link>
-            <Link href="/login">
+            <Link href="/sign-in">
               <button className="border border-white text-white px-6 py-2 rounded-lg font-medium hover:bg-white hover:text-black transition">
                 Login
               </button>
