@@ -61,9 +61,9 @@ export default function PieChart({
   const centerY = innerHeight / 2;
   const centerX = innerWidth / 2;
   
-  const pieOuterRadius = outerRadius || (viewMode === 'normal' ? radius * 0.5 : radius * 0.85); 
+  const pieOuterRadius = outerRadius || (viewMode === 'normal' ? radius * 0.5 : radius * 0.75); 
   
-  const effectiveInnerRadius = viewMode === 'advanced' ? radius * 0.4 : innerRadius;
+  const effectiveInnerRadius = viewMode === 'advanced' ? radius * 0.45 : innerRadius;
   
   const getItemColor = scaleOrdinal({
     domain: data.map(d => d.name),
@@ -83,6 +83,22 @@ export default function PieChart({
   const highestItem = getSortedData((a, b) => b.value - a.value)[0];
   const lowestItem = getSortedData((a, b) => a.value - b.value)[0];
   const averageValue = Math.round(total / data.length);
+
+  // Adjust label positions for specific segments in advanced view
+  const getLabelPosition = (name: string, angle: number, labelRadius: number) => {
+    // Default positions using the angle
+    let x = Math.cos(angle) * labelRadius;
+    let y = Math.sin(angle) * labelRadius;
+    
+    // For "In Progress", force position to top (90 degrees)
+    if (name === "In Progress" && viewMode === 'advanced') {
+      // Position at the top (-90 degrees in radians is -Math.PI/2)
+      x = 0;
+      y = -labelRadius - 10; // Additional offset to move it higher
+    }
+    
+    return { x, y };
+  };
 
   return (
     <div className="relative">
@@ -106,7 +122,7 @@ export default function PieChart({
         <rect rx={14} width={width} height={height} fill={"#28272c"} />
         
         {viewMode === 'advanced' && (
-          <Group top={margin.top} left={margin.left}>
+          <Group top={margin.top} left={margin.left + 10}>
             {data.map((item, i) => (
               <Group key={`legend-${i}`} top={i * 20}>
                 <rect 
@@ -150,9 +166,13 @@ export default function PieChart({
                 if (viewMode === 'advanced') {
                   const angle = Math.atan2(centroidY, centroidX);
                   const labelRadius = pieOuterRadius + 20;
-                  x = Math.cos(angle) * labelRadius;
-                  y = Math.sin(angle) * labelRadius;
-                  textAnchor = x > 0 ? 'start' : 'end';
+                  
+                  const adjustedPos = getLabelPosition(name, angle, labelRadius);
+                  x = adjustedPos.x;
+                  y = adjustedPos.y;
+                  
+                  // Set text alignment - for In Progress, force center alignment
+                  textAnchor = name === "In Progress" ? 'middle' : (x > 0 ? 'start' : 'end');
                 }
                 
                 const arcAngle = arc.endAngle - arc.startAngle;
@@ -203,8 +223,8 @@ export default function PieChart({
                             <line
                               x1={centroidX}
                               y1={centroidY}
-                              x2={x * 0.85}
-                              y2={y * 0.85}
+                              x2={name === "In Progress" ? 0 : x * 0.85}
+                              y2={name === "In Progress" ? -pieOuterRadius - 2 : y * 0.85}
                               stroke="white"
                               strokeWidth={0.5}
                               strokeDasharray="2,2"
@@ -233,7 +253,7 @@ export default function PieChart({
           {viewMode === 'advanced' && (
             <>
               <circle
-                r={radius * 0.38}
+                r={radius * 0.43}
                 fill="#28272c"
                 stroke="rgba(255,255,255,0.1)"
                 strokeWidth={1}
@@ -241,7 +261,7 @@ export default function PieChart({
               <text
                 textAnchor="middle"
                 x={0}
-                y={-5}
+                y={-15}
                 fill="white"
                 fontSize={12}
                 fontWeight="bold"
@@ -251,7 +271,7 @@ export default function PieChart({
               <text
                 textAnchor="middle"
                 x={0}
-                y={15}
+                y={5}
                 fill="white"
                 fontSize={10}
               >
@@ -260,16 +280,16 @@ export default function PieChart({
               <text
                 textAnchor="middle"
                 x={0}
-                y={30}
+                y={20}
                 fill="white"
                 fontSize={10}
               >
-                Highest: {highestItem?.name} ({highestItem?.value})
+                Highest: {highestItem?.name}
               </text>
               <text
                 textAnchor="middle"
                 x={0}
-                y={45}
+                y={35}
                 fill="white"
                 fontSize={10}
               >
