@@ -8,7 +8,6 @@ import { createClient } from "@/utils/supabase/client";
 
 type SidebarProps = {
   isCollapsed: boolean;
-  toggleSidebar: () => void;
 };
 
 export interface Project {
@@ -21,9 +20,11 @@ export interface Project {
   team_members: string[] | null;
 }
 
-export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
+export default function Sidebar({ isCollapsed }: SidebarProps) {
   const supabaseClient = createClient();
   const pathname = usePathname();
+  const pathParts = pathname.split("/");
+  const projectId = pathParts[pathParts.length - 1];
   const [projects, setProjects] = useState<Project[]>([]);
   const [showRemaining, setShowRemaining] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -36,23 +37,26 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     description: "",
   });
 
-  if (!isCollapsed) {
-    return null;
-  }
-
   const currentUserId = async () => {
     const { data, error } = await supabaseClient.auth.getUser();
     if (error) {
       console.error("Error fetching user:", error);
       return null;
     }
-    console.log(data)
+    console.log(data);
     return data?.user?.id ?? null;
   };
 
   useEffect(() => {
+    
+    const getUserId = async () => {
+      const userId = await currentUserId();
+      setId(userId);
+    };
+
+    getUserId();
     const fetchProjects = async () => {
-      const { data, error } = await supabaseClient.from("projects").select("*");
+      const { data, error } = await supabaseClient.from("projects").select("*").contains("team_members", [id]);
       if (error) {
         console.error("Error fetching projects:", error);
       } else {
@@ -61,12 +65,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     };
 
     fetchProjects();
-    const getUserId = async () => {
-      const userId = await currentUserId();
-      setId(userId);
-    };
-
-    getUserId();
   }, []);
 
   const firstSix = projects.slice(0, 6);

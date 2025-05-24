@@ -50,7 +50,7 @@ export default function Layout({
               : "w-0"
           }  shadow-lg transition-all duration-300 overflow-hidden h-[calc(100vh-4rem)] sticky top-16`}
         >
-          <Sidebar isCollapsed={isCollapsed} toggleSidebar={toggleSidebar} />
+          <Sidebar isCollapsed={isCollapsed}/>
         </div>
         {children}
       </div>
