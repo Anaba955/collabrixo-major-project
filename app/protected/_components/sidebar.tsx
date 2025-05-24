@@ -69,14 +69,11 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
       return;
     }
 
-    // Insert new project into Supabase
     const { data, error } = await supabaseClient
       .from("projects")
       .insert([{ 
         name: newProject.name, 
-        description: newProject.description, 
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        description: newProject.description,
       }])
       .select()
       .single();
