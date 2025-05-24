@@ -7,6 +7,7 @@ import NotificationPanel from './_components/NotificationPanel';
 import NotificationButton from './_components/NotificationButton';
 import { createClient } from '@/utils/supabase/client';
 import JeemBackground from './_components/JeemBackground';
+import TaskSummaryCards from './_components/TaskSummaryCards';
 
 // Task data interfaces
 interface TaskCounts {
@@ -240,7 +241,7 @@ export default function Dashboard() {
     if (width < 640) return 320; // Mobile
     if (width < 768) return 350; // Small tablet
     if (width < 1024) return 400; // Tablet/small laptop
-    return 400; // Desktop
+    return 450; // Desktop
   };
 
   const getHeatmapWidth = () => {
@@ -290,91 +291,7 @@ export default function Dashboard() {
       <JeemBackground opacity={0.7} blurAmount={120} speed={35} />
 
       {/* Task Summary Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
-        {/* Total Tasks */}
-        <Card className="border-2 border-black dark:border-gray-800 bg-white/70 backdrop-blur-lg dark:bg-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-16 h-16 bg-red-400 dark:bg-red-500 rounded-full opacity-40"></div>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs sm:text-sm font-mono uppercase text-gray-500 dark:text-gray-400 tracking-wider">Total Tasks</p>
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1">{taskCounts.total}</h3>
-                <div className="flex items-center mt-2 text-xs bg-green-100/90 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded font-medium">
-                  <span className="mr-1">↑</span> 8% from yesterday
-                </div>
-              </div>
-              <div className="bg-red-100/90 dark:bg-red-900/30 p-2 sm:p-3 rounded-md border-2 border-black dark:border-red-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 text-red-500 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Todo */}
-        <Card className="border-2 border-black dark:border-gray-800 bg-white/70 backdrop-blur-lg dark:bg-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-16 h-16 bg-yellow-400 dark:bg-yellow-500 rounded-full opacity-40"></div>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs sm:text-sm font-mono uppercase text-gray-500 dark:text-gray-400 tracking-wider">Todo</p>
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1">{taskCounts.todo}</h3>
-                <div className="flex items-center mt-2 text-xs bg-green-100/90 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded font-medium">
-                  <span className="mr-1">↑</span> 5% from yesterday
-                </div>
-              </div>
-              <div className="bg-yellow-100/90 dark:bg-yellow-900/30 p-2 sm:p-3 rounded-md border-2 border-black dark:border-yellow-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* In Progress */}
-        <Card className="border-2 border-black dark:border-gray-800 bg-white/70 backdrop-blur-lg dark:bg-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-16 h-16 bg-green-400 dark:bg-green-500 rounded-full opacity-40"></div>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs sm:text-sm font-mono uppercase text-gray-500 dark:text-gray-400 tracking-wider">In Progress</p>
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1">{taskCounts.inProgress}</h3>
-                <div className="flex items-center mt-2 text-xs bg-green-100/90 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded font-medium">
-                  <span className="mr-1">↑</span> 12% from yesterday
-                </div>
-              </div>
-              <div className="bg-green-100/90 dark:bg-green-900/30 p-2 sm:p-3 rounded-md border-2 border-black dark:border-green-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Done */}
-        <Card className="border-2 border-black dark:border-gray-800 bg-white/70 backdrop-blur-lg dark:bg-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-16 h-16 bg-purple-400 dark:bg-purple-500 rounded-full opacity-40"></div>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs sm:text-sm font-mono uppercase text-gray-500 dark:text-gray-400 tracking-wider">Done</p>
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1">{taskCounts.done}</h3>
-                <div className="flex items-center mt-2 text-xs bg-orange-100/90 dark:bg-orange-900 text-orange-700 dark:text-orange-300 px-2 py-1 rounded font-medium">
-                  <span className="mr-1">↑</span> 0.5% from yesterday
-                </div>
-              </div>
-              <div className="bg-purple-100/90 dark:bg-purple-900/30 p-2 sm:p-3 rounded-md border-2 border-black dark:border-purple-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <TaskSummaryCards />
 
       {/* Middle Row - Progress Graph and Pie Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-8">
@@ -410,8 +327,7 @@ export default function Dashboard() {
               {dimensions.width > 0 && !taskLoading && (
                 <PieChart 
                   width={getPieChartWidth()} 
-                  height={Math.min(getPieChartWidth() * 0.8, 270)} 
-                  data={pieChartData}
+                  height={Math.min(getPieChartWidth() * 0.8, 310)} 
                 />
               )}
               {taskLoading && (
