@@ -1,16 +1,10 @@
 "use client";
 
-import {
-  LayoutDashboard,
-  FolderTree,
-  Folder,
-  Plus,
-  X,
-} from "lucide-react";
+import { LayoutDashboard, FolderTree, Folder, Plus, X } from "lucide-react";
 import { useState, useEffect, ChangeEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createClient } from "@/utils/supabase/client"; 
+import { createClient } from "@/utils/supabase/client";
 
 type SidebarProps = {
   isCollapsed: boolean;
@@ -18,12 +12,12 @@ type SidebarProps = {
 };
 
 export interface Project {
-  project_id: string;        
-  name: string | null;          
+  project_id: string;
+  name: string | null;
   description: string | null;
-  created_at: string;    
-  updated_at: string;           
-  owner_id: string | null;      
+  created_at: string;
+  updated_at: string;
+  owner_id: string | null;
   team_members: string[] | null;
 }
 
@@ -33,10 +27,28 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showRemaining, setShowRemaining] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [newProject, setNewProject] = useState<{ name: string; description: string }>({
+  const [id, setId] = useState<string | null>(null);
+  const [newProject, setNewProject] = useState<{
+    name: string;
+    description: string;
+  }>({
     name: "",
     description: "",
   });
+
+  if (!isCollapsed) {
+    return null;
+  }
+
+  const currentUserId = async () => {
+    const { data, error } = await supabaseClient.auth.getUser();
+    if (error) {
+      console.error("Error fetching user:", error);
+      return null;
+    }
+    console.log(data)
+    return data?.user?.id ?? null;
+  };
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -49,16 +61,20 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     };
 
     fetchProjects();
-  }, []);
+    const getUserId = async () => {
+      const userId = await currentUserId();
+      setId(userId);
+    };
 
-  if (!isCollapsed) {
-    return null;
-  }
+    getUserId();
+  }, []);
 
   const firstSix = projects.slice(0, 6);
   const remaining = projects.slice(6);
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setNewProject((prev) => ({ ...prev, [name]: value }));
   };
@@ -71,10 +87,14 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
 
     const { data, error } = await supabaseClient
       .from("projects")
-      .insert([{ 
-        name: newProject.name, 
-        description: newProject.description,
-      }])
+      .insert([
+        {
+          name: newProject.name,
+          description: newProject.description,
+          owner_id: id,
+          team_members: [id],
+        },
+      ])
       .select()
       .single();
 
@@ -189,7 +209,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium mb-1">
+                  Description
+                </label>
                 <textarea
                   name="description"
                   value={newProject.description}
