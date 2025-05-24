@@ -6,9 +6,11 @@ import {
   FolderTree,
   Folder,
   Menu,
+  Plus,
 } from "lucide-react";
 import { useState } from "react";
 import  Link  from "next/link";
+import { usePathname } from "next/navigation";
 
 type SidebarProps = {
   isCollapsed: boolean;
@@ -16,7 +18,8 @@ type SidebarProps = {
 };
 
 export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
-  const [isProjectOpen, setIsProjectOpen] = useState(true);
+  const pathname = usePathname()
+  const isActive = pathname === "/protected"
   const [showRemaining, setShowRemaining] = useState(false);
   
   const projects = [
@@ -36,7 +39,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     { id: 14, name: "Product Launch Tracker" },
     { id: 15, name: "Bug Tracking System" },
   ];
-  
   const firstSix = projects.slice(0, 6);
   const remaining = projects.slice(6);
 
@@ -48,54 +50,47 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
     <div className="h-full overflow-y-auto">
       <div className="dark:text-white">
         <Link
-          href="/"
-          className="flex items-center gap-2 px-4 py-2 mt-2 hover:bg-slate-100 rounded-lg transform transition-all duration-300 ease-in hover:scale-105"
+          href="/protected"
+          className={`flex items-center gap-2 px-4 py-2 mt-2 rounded-lg transform transition-all duration-300 ease-in hover:scale-105 ${
+        isActive ? "bg-slate-100" : "hover:bg-slate-100"
+      }`}
         >
           <LayoutDashboard className="w-5 h-5 mr-3" />
           <span className="md:text-xl lg:text-base">Dashboard</span>
         </Link>
         <div className="mt-2">
-          <button
-            onClick={() => {
-              setIsProjectOpen(!isProjectOpen);
-              setShowRemaining(false);
-            }}
-            className={`w-full flex items-center px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors ${
-              isProjectOpen ? "bg-slate-100" : ""
-            }`}
-          >
-            <div className="flex items-center gap-2 w-full">
+          
+            <div className="flex items-center gap-2 w-full w-full flex items-center px-4 py-2 rounded-lg transition-colors">
               <FolderTree className="w-5 h-5" />
               <span className="md:text-xl lg:text-base">Projects</span>
-              <div className="ml-auto">
-                {isProjectOpen ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+              <div className="cursor-pointer ml-auto rounded p-2 hover:bg-slate-100 transform transition-all duration-300 ease-in hover:scale-105">
+                  <Plus className="h-4 w-4 w-full pointer" />
               </div>
             </div>
-          </button>
         </div>
-        {isProjectOpen && (
           <div className="ml-4 mt-2 space-y-1">
-            {firstSix.map((project) => (
-              <Link
-                href={`/projects/${project.id}`}
-                key={project.id}
-                className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg hover:bg-slate-100 transform transition-all duration-300 ease-in hover:scale-105"
-              >
-                <Folder className="h-4 w-4 text-slate-500" />
-                <span>{project.name}</span>
-              </Link>
-            ))}
+            {firstSix.map((project) => {
+              return (
+                <Link
+                  href={`/protected/projects/${project.id}`}
+                  key={project.id}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg transform transition-all duration-300 ease-in hover:scale-105 ${
+                    pathname === `protected/projects/${project.id}` ? "bg-slate-100" : "hover:bg-slate-100"
+                  }`}
+                >
+                  <Folder className="h-4 w-4 text-slate-500" />
+                  <span>{project.name}</span>
+                </Link>
+              );
+            })}
             {showRemaining &&
               remaining.map((project) => (
                 <Link
-                  href={`/projects/${project.id}`}
+                  href={`/protected/projects/${project.id}`}
                   key={project.id}
-                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg hover:bg-slate-100 transform-origin transition-all duration-300 ease-in-out hover:scale-105"
-                >
+                  className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg transform transition-all duration-300 ease-in hover:scale-105 ${
+                    pathname === `protected/projects/${project.id}` ? "bg-slate-100" : "hover:bg-slate-100"
+                  }`}>
                   <Folder className="h-4 w-4 text-slate-500" />
                   <span>{project.name}</span>
                 </Link>
@@ -109,7 +104,6 @@ export default function Sidebar({ isCollapsed, toggleSidebar }: SidebarProps) {
               </button>
             )}
           </div>
-        )}
       </div>
     </div>
   );
