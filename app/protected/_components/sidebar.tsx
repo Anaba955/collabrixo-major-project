@@ -5,6 +5,7 @@ import { useState, useEffect, ChangeEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { createPortal } from "react-dom";
 
 type SidebarProps = {
   isCollapsed: boolean;
@@ -36,6 +37,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
     name: "",
     description: "",
   });
+  const [isMounted, setIsMounted] = useState(false);
 
   const currentUserId = async () => {
     const { data, error } = await supabaseClient.auth.getUser();
@@ -48,6 +50,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
   };
 
   useEffect(() => {
+    setIsMounted(true);
     
     const getUserId = async () => {
       const userId = await currentUserId();
@@ -177,8 +180,8 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
         </div>
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 ">
+      {showForm && isMounted && createPortal(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[99999] p-4">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-xl w-full border-3 border-black dark:border-gray-700 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.3)]">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Add New Project</h2>
@@ -236,7 +239,8 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
