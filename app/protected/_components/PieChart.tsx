@@ -81,7 +81,7 @@ export default function PieChart({
       
       // Count tasks by status
       const todoCount = tasks.filter(task => task.status === 'todo').length;
-      const inProgressCount = tasks.filter(task => task.status === 'inprogress').length;
+      const inProgressCount = tasks.filter(task => task.status === 'inProgress').length;
       const doneCount = tasks.filter(task => task.status === 'done').length;
       
       // Format data for pie chart
@@ -127,7 +127,7 @@ export default function PieChart({
         // Initial data fetch
         await fetchChartData(user.id);
         
-        // Set up realtime subscription
+        // Set up realtime subscription and I separated events coz * wasn't working will check later if possible 
         realtimeChannel = supabase
           .channel('pie-chart-tasks-changes')
           .on('postgres_changes', 

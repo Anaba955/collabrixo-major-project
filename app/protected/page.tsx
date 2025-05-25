@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PieChart from './_components/PieChart';
-import Heatmap, { WeekData } from './_components/Heatmap';
+import Heatmap from './_components/Heatmap';
 import NotificationPanel from './_components/NotificationPanel';
 import NotificationButton from './_components/NotificationButton';
 import { createClient } from '@/utils/supabase/client';
@@ -22,45 +22,11 @@ interface PieChartItem {
   value: number;
 }
 
-// Dummy data for pie chart
-const DUMMY_PIE_CHART_DATA: PieChartItem[] = [
-  { name: 'To Do', value: 12 },
-  { name: 'In Progress', value: 8 },
-  { name: 'Done', value: 15 }
-];
-
-// Dummy data for task counts
-const DUMMY_TASK_COUNTS: TaskCounts = {
-  total: 35,
-  todo: 12,
-  inProgress: 8,
-  done: 15
-};
-
-// Dummy data generator for heatmap
-const generateDummyHeatmapData = (): WeekData[] => {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const weeks = 5;
-  
-  return Array.from({ length: weeks }, (_, weekIndex) => ({
-    bins: days.map(day => ({
-      day,
-      // Create a pattern - more activity on weekdays, less on weekends
-      count: day === 'Sat' || day === 'Sun' 
-        ? Math.floor(Math.random() * 3) // 0-2 for weekends
-        : Math.floor(Math.random() * 7) + 2 // 2-8 for weekdays
-    }))
-  }));
-};
-
 export default function Dashboard() {
   // State for task data
-  const [taskCounts, setTaskCounts] = useState<TaskCounts>(DUMMY_TASK_COUNTS);
-  const [pieChartData, setPieChartData] = useState<PieChartItem[]>(DUMMY_PIE_CHART_DATA);
+  const [taskCounts, setTaskCounts] = useState<TaskCounts | null>(null);
+  const [pieChartData, setPieChartData] = useState<PieChartItem[] | null>(null);
   const [taskLoading, setTaskLoading] = useState(true);
-
-  // State for heatmap data
-  const [weekData, setWeekData] = useState<WeekData[]>(generateDummyHeatmapData());
   const [heatmapLoading, setHeatmapLoading] = useState(true);
 
   // State to track window size for responsive components
@@ -77,9 +43,6 @@ export default function Dashboard() {
       try {
         setTaskLoading(true);
         
-        // Uncomment below to use real data from Supabase
-        // -------------------------------------------------
-        /*
         const supabase = createClient();
         
         // Get user ID
@@ -106,11 +69,11 @@ export default function Dashboard() {
             total += value;
             
             if (item.status === 'todo') todo = value;
-            else if (item.status === 'inprogress') inProgress = value;
+            else if (item.status === 'inProgress') inProgress = value;
             else if (item.status === 'done') done = value;
             
             return {
-              name: item.status === 'inprogress' ? 'In Progress' : 
+              name: item.status === 'inProgress' ? 'In Progress' : 
                     item.status === 'todo' ? 'To Do' : 
                     item.status === 'done' ? 'Done' : item.status,
               value: value
@@ -125,20 +88,10 @@ export default function Dashboard() {
           });
           setPieChartData(chartData);
         }
-        */
         
-        // Simulate API delay
-        setTimeout(() => {
-          setTaskCounts(DUMMY_TASK_COUNTS);
-          setPieChartData(DUMMY_PIE_CHART_DATA);
-          setTaskLoading(false);
-        }, 1000);
-        
+        setTaskLoading(false);
       } catch (error) {
         console.error('Error fetching task data:', error);
-        // Use dummy data as fallback
-        setTaskCounts(DUMMY_TASK_COUNTS);
-        setPieChartData(DUMMY_PIE_CHART_DATA);
         setTaskLoading(false);
       }
     };
@@ -146,57 +99,13 @@ export default function Dashboard() {
     fetchTaskData();
   }, []);
   
-  // Fetch heatmap data
+  // Set heatmap loaded after a short delay (no actual fetch needed)
   useEffect(() => {
-    const fetchHeatmapData = async () => {
-      try {
-        setHeatmapLoading(true);
-        
-        // Uncomment below to use real data from Supabase
-        // -------------------------------------------------
-        /*
-        const supabase = createClient();
-        
-        // Get user ID
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not found');
-        
-        // Get heatmap data from view
-        const { data, error } = await supabase
-          .from('vw_heatmap_data')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('week_number', { ascending: true });
-        
-        if (error) throw error;
-        
-        if (data && Array.isArray(data)) {
-          // Transform data to the format needed by Heatmap component
-          const formattedData: WeekData[] = data.map(week => ({
-            bins: week.bins.map((bin: any) => ({
-              count: bin.count,
-              day: bin.day
-            }))
-          }));
-          
-          setWeekData(formattedData);
-        }
-        */
-        
-        // Simulate API delay
-        setTimeout(() => {
-          setWeekData(generateDummyHeatmapData());
-          setHeatmapLoading(false);
-        }, 1000);
-        
-      } catch (error) {
-        console.error('Error fetching heatmap data:', error);
-        // Already using dummy data
-        setHeatmapLoading(false);
-      }
-    };
+    const timer = setTimeout(() => {
+      setHeatmapLoading(false);
+    }, 500);
     
-    fetchHeatmapData();
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -324,7 +233,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-3">
             <div className="h-64 sm:h-[300px] flex items-center justify-center">
-              {dimensions.width > 0 && !taskLoading && (
+              {dimensions.width > 0 && !taskLoading && pieChartData && (
                 <PieChart 
                   width={getPieChartWidth()} 
                   height={Math.min(getPieChartWidth() * 0.8, 310)} 
@@ -354,7 +263,6 @@ export default function Dashboard() {
               <Heatmap 
                 width={getHeatmapWidth()} 
                 height={240} 
-                weekData={weekData}
               />
             )}
             {heatmapLoading && (

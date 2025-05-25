@@ -36,6 +36,12 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
   
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [differences, setDifferences] = useState<{ total: number; todo: number; inProgress: number; done: number }>({
+    total: 0,
+    todo: 0,
+    inProgress: 0,
+    done: 0
+  });
 
   // Function to calculate task counts and percentages
   const calculateTaskMetrics = useCallback(async (userId: string) => {
@@ -56,90 +62,119 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
       const todayStr = today.toISOString();
       const yesterdayStr = yesterday.toISOString();
       
-      // Fetch all tasks assigned to current user
-      const { data: allTasks, error } = await supabase
+      console.log('Today date:', todayStr);
+      console.log('Yesterday date:', yesterdayStr);
+      
+      // Fetch current tasks (all tasks assigned to user)
+      const { data: currentTasks, error } = await supabase
         .from('tasks')
         .select('*')
         .eq('assigned_to', userId);
       
       if (error) {
-        console.error('Error fetching all tasks:', error);
+        console.error('Error fetching current tasks:', error);
         throw error;
       }
       
       // Fetch tasks created today
-      const { data: todayTasks, error: todayError } = await supabase
+      const { data: tasksBeforeToday, error: tasksBeforeTodayError } = await supabase
         .from('tasks')
         .select('*')
         .eq('assigned_to', userId)
-        .gte('created_at', todayStr);
+        .lt('created_at', todayStr);
       
-      if (todayError) {
-        console.error('Error fetching today tasks:', todayError);
-        throw todayError;
+      if (tasksBeforeTodayError) {
+        console.error('Error fetching tasks before today:', tasksBeforeTodayError);
+        throw tasksBeforeTodayError;
       }
       
       // Fetch tasks created yesterday
-      const { data: yesterdayTasks, error: yesterdayError } = await supabase
+      const { data: tasksCreatedYesterday, error: tasksCreatedYesterdayError } = await supabase
         .from('tasks')
         .select('*')
         .eq('assigned_to', userId)
         .gte('created_at', yesterdayStr)
         .lt('created_at', todayStr);
       
-      if (yesterdayError) {
-        console.error('Error fetching yesterday tasks:', yesterdayError);
-        throw yesterdayError;
+      if (tasksCreatedYesterdayError) {
+        console.error('Error fetching tasks created yesterday:', tasksCreatedYesterdayError);
+        throw tasksCreatedYesterdayError;
       }
       
-      // Make sure we have arrays even if no data was returned
-      const tasks = allTasks || [];
-      const today_tasks = todayTasks || [];
-      const yesterday_tasks = yesterdayTasks || [];
+      // Fetch tasks created today
+      const { data: tasksCreatedToday, error: tasksCreatedTodayError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('assigned_to', userId)
+        .gte('created_at', todayStr);
       
-      console.log('All tasks:', tasks.length);
-      console.log('Today tasks:', today_tasks.length);
-      console.log('Yesterday tasks:', yesterday_tasks.length);
+      if (tasksCreatedTodayError) {
+        console.error('Error fetching tasks created today:', tasksCreatedTodayError);
+        throw tasksCreatedTodayError;
+      }
       
-      // Count tasks by status
-      const counts = {
-        total: tasks.length,
-        todo: tasks.filter(task => task.status === 'todo').length,
-        inProgress: tasks.filter(task => task.status === 'inprogress').length,
-        done: tasks.filter(task => task.status === 'done').length
-      };
+      // Process data
+      const currentTasksArray = currentTasks || [];
+      const tasksBeforeTodayArray = tasksBeforeToday || [];
+      const tasksCreatedTodayArray = tasksCreatedToday || [];
+      const tasksCreatedYesterdayArray = tasksCreatedYesterday || [];
       
-      // Count today's tasks by status
-      const todayCounts = {
-        total: today_tasks.length,
-        todo: today_tasks.filter(task => task.status === 'todo').length,
-        inProgress: today_tasks.filter(task => task.status === 'inprogress').length,
-        done: today_tasks.filter(task => task.status === 'done').length
+      console.log('Total tasks:', currentTasksArray.length);
+      console.log('Tasks before today:', tasksBeforeTodayArray.length);
+      console.log('Tasks created today:', tasksCreatedTodayArray.length);
+      console.log('Tasks created yesterday:', tasksCreatedYesterdayArray.length);
+      
+      // Calculate the state as of end of yesterday (all tasks except those created today)
+      const yesterdayTasksArray = tasksBeforeTodayArray;
+      
+      // Count current tasks by status
+      const currentCounts = {
+        total: currentTasksArray.length,
+        todo: currentTasksArray.filter(task => task.status === 'todo').length,
+        inProgress: currentTasksArray.filter(task => task.status === 'inProgress').length,
+        done: currentTasksArray.filter(task => task.status === 'done').length
       };
       
       // Count yesterday's tasks by status
       const yesterdayCounts = {
-        total: yesterday_tasks.length,
-        todo: yesterday_tasks.filter(task => task.status === 'todo').length,
-        inProgress: yesterday_tasks.filter(task => task.status === 'inprogress').length,
-        done: yesterday_tasks.filter(task => task.status === 'done').length
+        total: yesterdayTasksArray.length,
+        todo: yesterdayTasksArray.filter(task => task.status === 'todo').length,
+        inProgress: yesterdayTasksArray.filter(task => task.status === 'inProgress').length,
+        done: yesterdayTasksArray.filter(task => task.status === 'done').length
+      };
+      
+      // Calculate differences
+      const differences = {
+        total: currentCounts.total - yesterdayCounts.total,
+        todo: currentCounts.todo - yesterdayCounts.todo,
+        inProgress: currentCounts.inProgress - yesterdayCounts.inProgress,
+        done: currentCounts.done - yesterdayCounts.done
       };
       
       // Calculate percentage changes
-      const calculatePercentage = (today: number, yesterday: number) => {
-        if (yesterday === 0) return today > 0 ? 100 : 0;
-        return Math.round(((today - yesterday) / yesterday) * 100);
+      const calculatePercentage = (current: number, previous: number) => {
+        if (previous === 0) {
+          return current * 100; // 100% per item (1 item = 100%, 2 items = 200%, etc.)
+        }
+        return Math.round(((current - previous) / previous) * 100);
       };
       
       const percentageChanges = {
-        total: calculatePercentage(todayCounts.total, yesterdayCounts.total),
-        todo: calculatePercentage(todayCounts.todo, yesterdayCounts.todo),
-        inProgress: calculatePercentage(todayCounts.inProgress, yesterdayCounts.inProgress),
-        done: calculatePercentage(todayCounts.done, yesterdayCounts.done)
+        total: calculatePercentage(currentCounts.total, yesterdayCounts.total),
+        todo: calculatePercentage(currentCounts.todo, yesterdayCounts.todo),
+        inProgress: calculatePercentage(currentCounts.inProgress, yesterdayCounts.inProgress),
+        done: calculatePercentage(currentCounts.done, yesterdayCounts.done)
       };
       
-      setTaskCounts(counts);
+      // Detailed logging
+      console.log('Current counts:', currentCounts);
+      console.log('Yesterday counts:', yesterdayCounts);
+      console.log('Differences:', differences);
+      console.log('Percentages:', percentageChanges);
+      
+      setTaskCounts(currentCounts);
       setPercentages(percentageChanges);
+      setDifferences(differences);
       setIsLoading(false);
     } catch (error) {
       console.error('Error calculating task metrics:', error);
@@ -256,14 +291,14 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
               <p className="text-xs sm:text-sm font-mono uppercase text-gray-500 dark:text-gray-400 tracking-wider">Total Tasks</p>
               <h3 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1">{taskCounts.total}</h3>
               <div className={`flex items-center mt-2 text-xs px-2 py-1 rounded font-medium ${
-                percentages.total > 0 
+                differences.total > 0 
                   ? 'bg-green-100/90 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                  : percentages.total < 0 
+                  : differences.total < 0 
                     ? 'bg-red-100/90 dark:bg-red-900 text-red-700 dark:text-red-300'
                     : 'bg-gray-100/90 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
               }`}>
-                <span className="mr-1">{percentages.total > 0 ? '↑' : percentages.total < 0 ? '↓' : '•'}</span> 
-                {Math.abs(percentages.total)}% from yesterday
+                <span className="mr-1">{differences.total > 0 ? '↑' : differences.total < 0 ? '↓' : '•'}</span> 
+                {differences.total > 0 ? '+' : ''}{differences.total} ({Math.abs(percentages.total)}%) today's increment
               </div>
             </div>
             <div className="bg-red-100/90 dark:bg-red-900/30 p-2 sm:p-3 rounded-md border-2 border-black dark:border-red-700">
@@ -284,14 +319,14 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
               <p className="text-xs sm:text-sm font-mono uppercase text-gray-500 dark:text-gray-400 tracking-wider">Todo</p>
               <h3 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1">{taskCounts.todo}</h3>
               <div className={`flex items-center mt-2 text-xs px-2 py-1 rounded font-medium ${
-                percentages.todo > 0 
+                differences.todo > 0 
                   ? 'bg-green-100/90 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                  : percentages.todo < 0 
+                  : differences.todo < 0 
                     ? 'bg-red-100/90 dark:bg-red-900 text-red-700 dark:text-red-300'
                     : 'bg-gray-100/90 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
               }`}>
-                <span className="mr-1">{percentages.todo > 0 ? '↑' : percentages.todo < 0 ? '↓' : '•'}</span> 
-                {Math.abs(percentages.todo)}% from yesterday
+                <span className="mr-1">{differences.todo > 0 ? '↑' : differences.todo < 0 ? '↓' : '•'}</span> 
+                {differences.todo > 0 ? '+' : ''}{differences.todo} ({Math.abs(percentages.todo)}%) today's increment
               </div>
             </div>
             <div className="bg-yellow-100/90 dark:bg-yellow-900/30 p-2 sm:p-3 rounded-md border-2 border-black dark:border-yellow-700">
@@ -312,14 +347,14 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
               <p className="text-xs sm:text-sm font-mono uppercase text-gray-500 dark:text-gray-400 tracking-wider">In Progress</p>
               <h3 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1">{taskCounts.inProgress}</h3>
               <div className={`flex items-center mt-2 text-xs px-2 py-1 rounded font-medium ${
-                percentages.inProgress > 0 
+                differences.inProgress > 0 
                   ? 'bg-green-100/90 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                  : percentages.inProgress < 0 
+                  : differences.inProgress < 0 
                     ? 'bg-red-100/90 dark:bg-red-900 text-red-700 dark:text-red-300'
                     : 'bg-gray-100/90 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
               }`}>
-                <span className="mr-1">{percentages.inProgress > 0 ? '↑' : percentages.inProgress < 0 ? '↓' : '•'}</span> 
-                {Math.abs(percentages.inProgress)}% from yesterday
+                <span className="mr-1">{differences.inProgress > 0 ? '↑' : differences.inProgress < 0 ? '↓' : '•'}</span> 
+                {differences.inProgress > 0 ? '+' : ''}{differences.inProgress} ({Math.abs(percentages.inProgress)}%) today's increment
               </div>
             </div>
             <div className="bg-green-100/90 dark:bg-green-900/30 p-2 sm:p-3 rounded-md border-2 border-black dark:border-green-700">
@@ -340,14 +375,14 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
               <p className="text-xs sm:text-sm font-mono uppercase text-gray-500 dark:text-gray-400 tracking-wider">Done</p>
               <h3 className="text-2xl sm:text-3xl md:text-4xl font-black mt-1">{taskCounts.done}</h3>
               <div className={`flex items-center mt-2 text-xs px-2 py-1 rounded font-medium ${
-                percentages.done > 0 
+                differences.done > 0 
                   ? 'bg-green-100/90 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                  : percentages.done < 0 
+                  : differences.done < 0 
                     ? 'bg-red-100/90 dark:bg-red-900 text-red-700 dark:text-red-300'
                     : 'bg-gray-100/90 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
               }`}>
-                <span className="mr-1">{percentages.done > 0 ? '↑' : percentages.done < 0 ? '↓' : '•'}</span> 
-                {Math.abs(percentages.done)}% from yesterday
+                <span className="mr-1">{differences.done > 0 ? '↑' : differences.done < 0 ? '↓' : '•'}</span> 
+                {differences.done > 0 ? '+' : ''}{differences.done} ({Math.abs(percentages.done)}%) today's increment
               </div>
             </div>
             <div className="bg-purple-100/90 dark:bg-purple-900/30 p-2 sm:p-3 rounded-md border-2 border-black dark:border-purple-700">
