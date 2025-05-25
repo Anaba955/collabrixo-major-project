@@ -96,10 +96,9 @@ function Heatmap({
     try {
       const supabase = createClient();
       
-      // Get all tasks for the user
       const { data: allTasks, error } = await supabase
         .from('tasks')
-        .select('created_at, status')
+        .select('updated_at, status')
         .eq('assigned_to', userId);
       
       if (error) {
@@ -113,9 +112,8 @@ function Heatmap({
       // Create empty calendar grid with today as the last cell
       const calendarGrid = createEmptyCalendarGrid();
       
-      // Fill in the data from tasks
       tasks.forEach(task => {
-        const taskDate = new Date(task.created_at);
+        const activityDate = new Date(task.updated_at);
         
         // Find matching cell in our grid
         for (let weekIndex = 0; weekIndex < calendarGrid.length; weekIndex++) {
@@ -123,9 +121,9 @@ function Heatmap({
             const cellDate = calendarGrid[weekIndex].bins[dayIndex].date;
             
             // Check if dates match (ignoring time)
-            if (taskDate.getFullYear() === cellDate.getFullYear() &&
-                taskDate.getMonth() === cellDate.getMonth() &&
-                taskDate.getDate() === cellDate.getDate()) {
+            if (activityDate.getFullYear() === cellDate.getFullYear() &&
+                activityDate.getMonth() === cellDate.getMonth() &&
+                activityDate.getDate() === cellDate.getDate()) {
               
               // Increment count for matching date
               calendarGrid[weekIndex].bins[dayIndex].count += 1;
@@ -135,7 +133,7 @@ function Heatmap({
         }
       });
       
-      console.log('Heatmap data updated:', calendarGrid);
+      console.log('Heatmap activity data updated:', calendarGrid);
       setWeekData(calendarGrid);
       setIsLoading(false);
       
