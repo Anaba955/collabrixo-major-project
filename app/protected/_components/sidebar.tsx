@@ -45,7 +45,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
       console.error("Error fetching user:", error);
       return null;
     }
-    console.log(data);
+  
     return data?.user?.id ?? null;
   };
 

@@ -3,19 +3,24 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import Board, { Task } from "./Board";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
 // Sample task data templates (without IDs)
 
 const BoardContent: React.FC = () => {
   const supabaseClient = createClient();
+  const pathname = usePathname()
+  const pathParts = pathname.split("/");
+  const projectId = pathParts[pathParts.length - 1];
   const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchTasks = async () => {
       const { data, error } = await supabaseClient
         .from("tasks") // your tasks table
-        .select("*");
+        .select("*")
+        .eq("project_id", projectId);
 
       if (error) {
         console.error("Error fetching tasks:", error);

@@ -65,6 +65,9 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   const pathParts = pathname.split("/");
   const projectId = pathParts[pathParts.length - 1];
   const [id, setId] = useState<string | null>(null);
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({});
+
+  // const [assignedId, setAssignedId] = useState<string | null>(null);
   // const channels = supabaseClient.channel('custom-all-channel')
   // .on(
   //   'postgres_changes',
@@ -126,14 +129,26 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
 
   // Add this near the other state variables (around line 90)
   const [deadlineDays, setDeadlineDays] = useState<number>(7);
-const currentUserId = async () => {
+  const currentUserId = async () => {
     const { data, error } = await supabaseClient.auth.getUser();
     if (error) {
       console.error("Error fetching user:", error);
       return null;
     }
-    console.log(data);
+
     return data?.user?.id ?? null;
+  };
+
+  const fetchEmail = async (id: string) => {
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .select("email")
+      .eq("id", id)
+      .single();
+    if (error) {
+      console.error("Error fecthing email", error.message);
+    }
+    return data?.email ?? null;
   };
   // Initialize tasks from props
   useEffect(() => {
@@ -162,6 +177,31 @@ const currentUserId = async () => {
     };
 
     getUserId();
+
+    const fetchAllEmails = async () => {
+      const userIds = Array.from(
+        new Set(
+          initialTasks
+            .map((task) => task.created_by)
+            .filter((id): id is string => typeof id === "string")
+        )
+      );
+
+      const emailsMap: Record<string, string> = {};
+
+      await Promise.all(
+        userIds.map(async (userId) => {
+          const email = await fetchEmail(userId);
+          if (email) emailsMap[userId] = email;
+        })
+      );
+
+      setUserEmails(emailsMap);
+    };
+
+    if (initialTasks.length > 0) {
+      fetchAllEmails();
+    }
   }, [initialTasks]);
 
   // Handle drag start
@@ -177,7 +217,7 @@ const currentUserId = async () => {
   };
 
   // Handle drop
-  const handleDrop = (e: React.DragEvent, columnId: string) => {
+  const handleDrop = async (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
 
     if (!draggedTask) return;
@@ -210,6 +250,16 @@ const currentUserId = async () => {
 
     setColumns(updatedColumns);
     setDraggedTask(null);
+
+    const { error } = await supabaseClient
+      .from("tasks")
+      .update({ status: columnId })
+      .eq("task_id", draggedTask.task_id);
+
+    if (error) {
+      console.error("Error updating task status:", error.message);
+      // Optionally show an alert or revert UI change
+    }
   };
 
   // Handle showing the add task modal
@@ -219,10 +269,23 @@ const currentUserId = async () => {
 
   // Handle submitting the new task form
   const handleSubmitTask = async (e: any) => {
+    e.preventDefault();
+
     if (!newTask.title) return;
-    // const assignedEmail = await supabaseClient.from("users").select("id").eq("Email", newTask.assigned_to).single()
-    // console.log(assignedEmail)
-    const { data } = await supabaseClient
+
+    const { data, error: fetchIdError } = await supabaseClient
+      .from("profiles")
+      .select("id")
+      .eq("email", newTask.assigned_to)
+      .single();
+
+    if (fetchIdError || !data) {
+      console.error("Error fetching email", fetchIdError?.message || "No data");
+      return;
+    }
+
+    const assignedId = data.id;
+    const { data: insertedTask, error } = await supabaseClient
       .from("tasks")
       .insert([
         {
@@ -231,18 +294,18 @@ const currentUserId = async () => {
           description: newTask.description,
           status: newTask.status,
           created_by: id,
-          // assigned_to: assignedEmail,
-          assigned_to: newTask.assigned_to,
+          assigned_to: assignedId,
           deadline: newTask.deadline,
         },
       ])
-      .select();
+      .select("*")
+      .single();
 
-    const insertedTask = data?.[0];
-    if (!insertedTask) {
-      console.error("No task returned after insert");
+    if (error) {
+      console.error("Error inserting task:", error.message);
       return;
     }
+
     setColumns((prev) => {
       const targetColumn = prev[insertedTask.status];
       return {
@@ -319,7 +382,19 @@ const currentUserId = async () => {
   };
 
   // Add a new function to handle task deletion
-  const handleDeleteTask = (taskId: string, columnId: string) => {
+  const handleDeleteTask = async (taskId: string, columnId: string) => {
+    console.log(taskId);
+    const { data, error } = await supabaseClient
+      .from("tasks")
+      .delete()
+      .eq("task_id", taskId)
+      .select();
+    if (error) {
+      console.log("Error while deleting the task", error.message);
+      return;
+    }
+    console.log("row deleted", data);
+
     setColumns((prevColumns) => {
       const updatedColumns = { ...prevColumns };
       updatedColumns[columnId].tasks = updatedColumns[columnId].tasks.filter(
@@ -327,10 +402,11 @@ const currentUserId = async () => {
       );
       return updatedColumns;
     });
+    setIsDetailModalOpen(false);
   };
 
   // Handle task click
-  const handleTaskClick = (task: Task) => {
+  const handleTaskClick = async (task: Task) => {
     // Calculate days until deadline if there's a deadline set
     const taskWithDays: Task = { ...task };
     if (task.deadline) {
@@ -340,6 +416,24 @@ const currentUserId = async () => {
     setSelectedTask(taskWithDays);
     setEditedTask(taskWithDays);
     setIsDetailModalOpen(true);
+
+    const { data, error } = await supabaseClient
+      .from("tasks")
+      .select("comments")
+      .eq("task_id", task.task_id)
+      .single();
+
+    if (error) {
+      console.error("Failed to fetch comments:", error.message);
+      return;
+    }
+
+    const comments = Array.isArray(data.comments) ? data.comments : [];
+
+    setTaskComments((prev) => ({
+      ...prev,
+      [task.task_id]: comments,
+    }));
   };
 
   // Handle closing the detail modal
@@ -350,8 +444,8 @@ const currentUserId = async () => {
   };
 
   // Handle task update
-  const handleTaskUpdate = () => {
-    if (!selectedTask || !editedTask.title) return;
+  const handleTaskUpdate = async () => {
+    if (!selectedTask) return;
 
     // If deadlineDays is set, calculate the new deadline date
     if (deadlineDays) {
@@ -361,29 +455,36 @@ const currentUserId = async () => {
       editedTask.deadline = futureDate.toISOString().split("T")[0];
     }
 
-    // Find task and update it
+    const updatedTask = { ...selectedTask, ...editedTask } as Task;
+
+    const { error } = await supabaseClient
+      .from("tasks")
+      .update({
+        title: updatedTask.title,
+        description: updatedTask.description,
+        status: updatedTask.status,
+        deadline: updatedTask.deadline,
+      })
+      .eq("task_id", selectedTask.task_id);
+
+    if (error) {
+      console.error("Error updating task:", error.message);
+      return;
+    }
+
     const updatedColumns = { ...columns };
-    const columnId = selectedTask.status;
+    const oldColumnId = selectedTask.status;
+    const newColumnId = updatedTask.status || oldColumnId;
 
-    updatedColumns[columnId].tasks = updatedColumns[columnId].tasks.map(
-      (task) => {
-        if (task.task_id === selectedTask.task_id) {
-          return { ...task, ...editedTask } as Task;
-        }
-        return task;
-      }
-    );
-
-    // If status changed, move task to the new column
-    if (editedTask.status && editedTask.status !== selectedTask.status) {
-      // Remove from old column
-      updatedColumns[columnId].tasks = updatedColumns[columnId].tasks.filter(
-        (task) => task.task_id !== selectedTask.task_id
+    if (oldColumnId !== newColumnId) {
+      updatedColumns[oldColumnId].tasks = updatedColumns[
+        oldColumnId
+      ].tasks.filter((task) => task.task_id !== selectedTask.task_id);
+      updatedColumns[newColumnId].tasks.push(updatedTask);
+    } else {
+      updatedColumns[oldColumnId].tasks = updatedColumns[oldColumnId].tasks.map(
+        (task) => (task.task_id === selectedTask.task_id ? updatedTask : task)
       );
-
-      // Add to new column
-      const updatedTask = { ...selectedTask, ...editedTask } as Task;
-      updatedColumns[editedTask.status].tasks.push(updatedTask);
     }
 
     setColumns(updatedColumns);
@@ -392,15 +493,32 @@ const currentUserId = async () => {
     setEditedTask({});
   };
 
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 60) return "just now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hrs ago`;
+    if (seconds < 172800) return "Yesterday";
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   // Handle comment submission
-  const handleCommentSubmit = () => {
+  const handleCommentSubmit = async () => {
     if (!selectedTask || !newComment.trim()) return;
 
     const commentId = `comment-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const comment: TaskComment = {
       id: commentId,
-      author: "Current User",
-      content: newComment,
+      author: id || "",
+      content: newComment.trim(),
       created_at: new Date().toISOString(),
     };
 
@@ -408,6 +526,32 @@ const currentUserId = async () => {
       ...prev,
       [selectedTask.task_id]: [...(prev[selectedTask.task_id] || []), comment],
     }));
+
+    const { data: taskComments, error } = await supabaseClient
+      .from("tasks")
+      .select("comments")
+      .eq("task_id", selectedTask.task_id)
+      .single();
+
+    if (error) {
+      console.log("Error fetching comment", error.message);
+      return;
+    }
+    console.log(taskComments);
+    const existingComments = Array.isArray(taskComments.comments)
+      ? taskComments?.comments
+      : [];
+    const updatedComments = [...existingComments, comment];
+    console.log(updatedComments);
+
+    const { error: updateCommentError } = await supabaseClient
+      .from("tasks")
+      .update({ comments: updatedComments })
+      .eq("task_id", selectedTask.task_id);
+
+    if (updateCommentError) {
+      console.log("Error while updating comment", updateCommentError.message);
+    }
 
     setNewComment("");
   };
@@ -467,7 +611,8 @@ const currentUserId = async () => {
   const getColumnName = (columnId: string): string => {
     return columns[columnId]?.title || columnId;
   };
-
+  const canEditTask =
+    selectedTask?.assigned_to === id || selectedTask?.created_by === id;
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Background gradient */}
@@ -533,7 +678,7 @@ const currentUserId = async () => {
               {columns[selectedColumn].tasks.map((task) => (
                 <div
                   key={task.task_id}
-                  draggable
+                  draggable={canEditTask}
                   onDragStart={(e) => handleDragStart(e, task)}
                   onClick={() => handleTaskClick(task)}
                   className="bg-white dark:bg-gray-800 p-4 rounded-lg border-3 border-black dark:border-gray-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] cursor-grab"
@@ -549,6 +694,7 @@ const currentUserId = async () => {
                             e.stopPropagation();
                             handleDeleteTask(task.task_id, task.status);
                           }}
+                          disabled={!canEditTask}
                           className="h-6 w-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-full"
                         >
                           <Trash size={14} />
@@ -587,18 +733,18 @@ const currentUserId = async () => {
                           <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1">
                             <span className="mr-1">Created by:</span>
                             <span className="font-medium">
-                              {task.created_by}
+                              {userEmails[task.created_by]}
                             </span>
                           </div>
                         )}
 
-                        {task.assigned_to && (
+                        {task.assigned_to && userEmails[task.assigned_to] && (
                           <div className="flex items-center text-xs">
                             <div className="flex-shrink-0 mr-2">
-                              {renderAvatar(task.assigned_to)}
+                              {renderAvatar(userEmails[task.assigned_to])}
                             </div>
                             <span className="font-medium">
-                              {task.assigned_to}
+                              {userEmails[task.assigned_to]}
                             </span>
                           </div>
                         )}
@@ -627,7 +773,7 @@ const currentUserId = async () => {
                 {columns[columnId].tasks.map((task) => (
                   <div
                     key={task.task_id}
-                    draggable
+                    draggable={canEditTask}
                     onDragStart={(e) => handleDragStart(e, task)}
                     onClick={() => handleTaskClick(task)}
                     className="bg-white dark:bg-gray-800 p-4 rounded-lg border-3 border-black dark:border-gray-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] cursor-grab"
@@ -643,6 +789,7 @@ const currentUserId = async () => {
                               e.stopPropagation();
                               handleDeleteTask(task.task_id, task.status);
                             }}
+                            disabled={!canEditTask}
                             className="h-6 w-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-full"
                           >
                             <Trash size={14} />
@@ -681,18 +828,18 @@ const currentUserId = async () => {
                             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1">
                               <span className="mr-1">Created by:</span>
                               <span className="font-medium">
-                                {task.created_by}
+                                {userEmails[task.created_by]}
                               </span>
                             </div>
                           )}
 
-                          {task.assigned_to && (
+                          {task.assigned_to && userEmails[task.assigned_to] && (
                             <div className="flex items-center text-xs">
                               <div className="flex-shrink-0 mr-2">
-                                {renderAvatar(task.assigned_to)}
+                                {renderAvatar(userEmails[task.assigned_to])}
                               </div>
                               <span className="font-medium">
-                                {task.assigned_to}
+                                {userEmails[task.assigned_to]}
                               </span>
                             </div>
                           )}
@@ -759,63 +906,75 @@ const currentUserId = async () => {
                           description: e.target.value,
                         })
                       }
+                      disabled={!canEditTask}
                       className="w-full bg-transparent border-0 focus:ring-0 text-sm text-gray-700 dark:text-gray-300 resize-none min-h-[100px]"
                       placeholder="Add a description..."
                     />
                   </div>
                 </div>
 
-                {/* Comments section */}
                 <div>
                   <h3 className="text-base font-medium mb-2">Comments</h3>
-                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600 mb-2">
-                    {taskComments[selectedTask.task_id]?.length > 0 ? (
-                      <div className="space-y-3">
-                        {taskComments[selectedTask.task_id].map((comment) => (
+
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600 mb-2 h-64 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+                      {taskComments[selectedTask.task_id]?.length > 0 ? (
+                        taskComments[selectedTask.task_id].map((comment) => (
                           <div
                             key={comment.id}
                             className="border-b border-gray-200 dark:border-gray-600 pb-3"
                           >
                             <div className="flex items-center mb-1">
                               <div className="mr-2">
-                                {renderAvatar(comment.author)}
+                                {renderAvatar(
+                                  userEmails[comment.author] || comment.author
+                                )}
                               </div>
                               <span className="font-medium text-sm">
-                                {comment.author}
+                                {userEmails[comment.author]}
                               </span>
                               <span className="text-xs text-gray-500 ml-2">
-                                {formatDate(comment.created_at)}
+                                {formatTimeAgo(comment.created_at)}
                               </span>
                             </div>
                             <p className="text-sm">{comment.content}</p>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">No comments yet.</p>
-                    )}
-                  </div>
-
-                  {/* Add comment form */}
-                  <div className="flex gap-2">
-                    <div className="flex-shrink-0">
-                      {renderAvatar("Current User")}
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          No comments yet.
+                        </p>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <textarea
-                        placeholder="Add a comment..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
-                        rows={3}
-                      />
-                      <button
-                        onClick={handleCommentSubmit}
-                        disabled={!newComment.trim()}
-                        className="mt-2 px-4 py-1 bg-blue-500 text-white rounded-md text-sm disabled:opacity-50"
-                      >
-                        Comment
-                      </button>
+
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                      {selectedTask.assigned_to === id ? (
+                        <div className="flex gap-2">
+                          <div className="flex-shrink-0">
+                            {renderAvatar((userEmails[id ?? ""] || id) ?? "U")}
+                          </div>
+                          <div className="flex-1">
+                            <textarea
+                              placeholder="Add a comment..."
+                              value={newComment}
+                              onChange={(e) => setNewComment(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm resize-none"
+                              rows={2}
+                            />
+                            <button
+                              onClick={handleCommentSubmit}
+                              disabled={!newComment.trim()}
+                              className="mt-2 px-4 py-1 bg-blue-500 text-white rounded-md text-sm disabled:opacity-50"
+                            >
+                              Comment
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">
+                          Only the assigned user can comment on this task.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -833,6 +992,7 @@ const currentUserId = async () => {
                       </span>
                       <select
                         value={editedTask.status || selectedTask.status}
+                        disabled={!canEditTask}
                         onChange={(e) =>
                           setEditedTask({
                             ...editedTask,
@@ -852,11 +1012,12 @@ const currentUserId = async () => {
                         Assignee
                       </span>
                       <div className="flex items-center mt-1">
-                        {selectedTask.assigned_to ? (
+                        {selectedTask.assigned_to &&
+                        userEmails[selectedTask.assigned_to] ? (
                           <>
-                            {renderAvatar(selectedTask.assigned_to)}
+                            {renderAvatar(userEmails[selectedTask.assigned_to])}
                             <span className="ml-2 text-sm">
-                              {selectedTask.assigned_to}
+                              {userEmails[selectedTask.assigned_to]}
                             </span>
                           </>
                         ) : (
@@ -895,6 +1056,7 @@ const currentUserId = async () => {
                             }
                             onChange={(e) => {
                               const days = parseInt(e.target.value);
+                              setDeadlineDays(days ?? 0);
                               if (!isNaN(days)) {
                                 // Calculate new deadline date based on days from now
                                 const date = new Date();
@@ -907,8 +1069,13 @@ const currentUserId = async () => {
                                   deadline: newDeadline,
                                   deadlineDays: days,
                                 });
+                                setSelectedTask({
+                                  ...selectedTask,
+                                  deadlineDays: days,
+                                });
                               }
                             }}
+                            disabled={!canEditTask}
                             className="mt-1 block w-full py-1 px-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
                           />
                         </div>
@@ -930,6 +1097,7 @@ const currentUserId = async () => {
                 {/* Actions */}
                 <div className="space-y-2">
                   <button
+                    disabled={!canEditTask}
                     onClick={handleTaskUpdate}
                     className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-medium transition-colors duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,0.3)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,0.3)] flex items-center justify-center"
                   >
@@ -937,6 +1105,7 @@ const currentUserId = async () => {
                   </button>
 
                   <button
+                    disabled={!canEditTask}
                     onClick={() =>
                       handleDeleteTask(
                         selectedTask.task_id,
@@ -949,7 +1118,7 @@ const currentUserId = async () => {
                   </button>
 
                   <button
-                    onClick={() => setIsDetailModalOpen(false)}
+                    onClick={() => handleCloseDetailModal()}
                     className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 px-4 py-2 rounded-md font-medium transition-colors duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,0.2)]"
                   >
                     Close
@@ -1040,6 +1209,7 @@ const currentUserId = async () => {
                   Deadline
                 </label>
                 <input
+                  min={"0"}
                   type="date"
                   name="deadline"
                   value={newTask.deadline || ""}
