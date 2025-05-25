@@ -221,7 +221,9 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
     e.preventDefault();
 
     if (!draggedTask) return;
-
+    if (!(draggedTask.assigned_to === id || draggedTask.created_by === id)) {
+      return;
+    }
     // Source column
     const sourceColumn = columns[draggedTask.status];
     // Remove from source column
@@ -613,6 +615,7 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   };
   const canEditTask =
     selectedTask?.assigned_to === id || selectedTask?.created_by === id;
+
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Background gradient */}
@@ -678,7 +681,6 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
               {columns[selectedColumn].tasks.map((task) => (
                 <div
                   key={task.task_id}
-                  draggable={canEditTask}
                   onDragStart={(e) => handleDragStart(e, task)}
                   onClick={() => handleTaskClick(task)}
                   className="bg-white dark:bg-gray-800 p-4 rounded-lg border-3 border-black dark:border-gray-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] cursor-grab"
@@ -687,7 +689,14 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                     <div className="flex-1 overflow-hidden">
                       <div className="flex justify-between">
                         <h3 className="font-semibold text-lg border-b-2 border-black dark:border-gray-600 pb-1">
-                          {task.title}
+                          {task.title
+                            ?.toLowerCase()
+                            .split(" ")
+                            .map(
+                              (word) =>
+                                word.charAt(0).toUpperCase() + word.slice(1)
+                            )
+                            .join(" ")}
                         </h3>
                         <button
                           onClick={(e) => {
@@ -773,7 +782,6 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                 {columns[columnId].tasks.map((task) => (
                   <div
                     key={task.task_id}
-                    draggable={canEditTask}
                     onDragStart={(e) => handleDragStart(e, task)}
                     onClick={() => handleTaskClick(task)}
                     className="bg-white dark:bg-gray-800 p-4 rounded-lg border-3 border-black dark:border-gray-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] cursor-grab"
@@ -782,7 +790,14 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                       <div className="flex-1 overflow-hidden">
                         <div className="flex justify-between">
                           <h3 className="font-semibold text-lg border-b-2 border-black dark:border-gray-600 pb-1">
-                            {task.title}
+                            {task.title
+                              ?.toLowerCase()
+                              .split(" ")
+                              .map(
+                                (word) =>
+                                  word.charAt(0).toUpperCase() + word.slice(1)
+                              )
+                              .join(" ")}
                           </h3>
                           <button
                             onClick={(e) => {
