@@ -52,6 +52,15 @@ interface BoardProps {
 const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   // Reference for keeping track of the next task ID counter
   const supabaseClient = createClient();
+  // const channels = supabaseClient.channel('custom-all-channel')
+  // .on(
+  //   'postgres_changes',
+  //   { event: '*', schema: 'public', table: 'projects' },
+  //   (payload) => {
+  //     console.log('Change received!', payload)
+  //   }
+  // )
+  // .subscribe()
   const taskIdCounterRef = useRef(initialTasks.length + 1);
   
   // State to manage the form modal
