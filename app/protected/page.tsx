@@ -315,13 +315,13 @@ export default function Dashboard() {
           <CardContent className="p-4 sm:p-6">
             <div className="h-64 sm:h-[300px] flex items-center justify-center bg-gradient-to-r from-gray-50/90 to-gray-100/90 dark:from-gray-900/20 dark:to-gray-800/20 rounded-md border-2 border-dashed border-black dark:border-gray-700">
               {/* This is a placeholder for the Progress Graph component */}
-              <BarsWithLine
+              {/* <BarsWithLine
                 width={600}
                 height={400}
                 data={taskChartData}
                 events={true}
                 onStatusChange={(status) => console.log("Status:", status)}
-              />
+              /> */}
               <p className="text-gray-500 dark:text-gray-400 font-mono text-sm">
                 Progress Graph Component Placeholder
               </p>
