@@ -2,6 +2,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Github, LayoutDashboard, MessageSquare } from "lucide-react";
 import BoardContent from "./ui/BoardContent"
+import GithubActivity from "./GithubActivity";
 
 export default function TabsSection() {
     return (
@@ -49,7 +50,7 @@ export default function TabsSection() {
                 value="activity"
                 className="w-full min-h-[500px] rounded-lg px-2"
               >
-                Github activity will go here.
+                <GithubActivity />
               </TabsContent>
             </div>
           </Tabs>

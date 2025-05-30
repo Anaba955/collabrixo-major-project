@@ -1,14 +1,15 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import PieChart from "./_components/PieChart";
-import Heatmap from "./_components/Heatmap";
-import NotificationPanel from "./_components/NotificationPanel";
-import NotificationButton from "./_components/NotificationButton";
-import { createClient } from "@/utils/supabase/client";
-import JeemBackground from "./_components/JeemBackground";
-import TaskSummaryCards from "./_components/TaskSummaryCards";
-import BarsWithLine from "./_components/BarsWithLines";
+import PieChart from './_components/PieChart';
+import Heatmap from './_components/Heatmap';
+import NotificationPanel from './_components/NotificationPanel';
+import NotificationButton from './_components/NotificationButton';
+import { createClient } from '@/utils/supabase/client';
+import JeemBackground from './_components/JeemBackground';
+import TaskSummaryCards from './_components/TaskSummaryCards';
+import Link from 'next/link';
+import { Settings } from 'lucide-react';
 
 // Task data interfaces
 interface TaskCounts {
@@ -31,12 +32,21 @@ interface PieChartItem {
   value: number;
 }
 
+interface Profile {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+}
+
 export default function Dashboard() {
   // State for task data
   const [taskCounts, setTaskCounts] = useState<TaskCounts | null>(null);
   const [pieChartData, setPieChartData] = useState<PieChartItem[] | null>(null);
   const [taskLoading, setTaskLoading] = useState(true);
   const [heatmapLoading, setHeatmapLoading] = useState(true);
+  // State for user profile data
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // State to track window size for responsive components
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -45,6 +55,39 @@ export default function Dashboard() {
 
   // Reference to track clicks outside
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const supabase = createClient();
+        
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          throw new Error('User not found');
+        }
+        
+        // Get user profile from profiles table
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .eq('id', user.id)
+          .single();
+          
+        if (!profileError && profileData) {
+          setProfile(profileData);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        setLoading(false);
+      }
+    };
+    
+    fetchUserProfile();
+  }, []);
 
   // Fetch task data
   useEffect(() => {
@@ -223,25 +266,24 @@ export default function Dashboard() {
             />
           </div>
           <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg max-w-[90vw] md:max-w-none">
-            Welcome back,{" "}
-            <span className="font-semibold">
-              Quadeer, Hope you bought yourself a cup of coffee
-            </span>
+            Welcome back, <span className="font-semibold">
+              {profile?.username || "User"}</span>
           </p>
         </div>
 
         <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
-          <div className="bg-white/70 backdrop-blur-lg dark:bg-gray-800 px-3 sm:px-4 py-2 rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] border-2 border-black dark:border-white">
-            <span className="font-bold text-sm sm:text-base">quadeer2003</span>
+          <div className="bg-white/70 backdrop-blur-lg dark:bg-gray-800 px-3 sm:px-4 py-2 rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] border-2 border-black dark:border-white flex items-center gap-2">
+            <Link href="/protected/profile" className="hover:text-blue-500 transition-colors">
+              <Settings className="h-4 w-4" />
+            </Link>
+            <span className="font-bold text-sm sm:text-base">{profile?.username || "User"}</span>
           </div>
           <div className="h-16 w-16 sm:h-16 sm:w-16 rounded-md bg-black dark:bg-white shadow-[4px_4px_0px_0px_rgba(128,128,128,1)] overflow-hidden border-2 border-black dark:border-white flex-shrink-0">
             <div className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 w-full h-full">
-              <img
-                src="/dance.gif"
-                alt="Quadeer"
-                width={60}
-                height={60}
-                className="w-full h-full object-cover"
+              <img 
+                src={profile?.avatar_url || "/dance.gif"} 
+                alt={profile?.username || "User"} 
+                className="w-full h-full object-cover" 
               />
             </div>
           </div>
