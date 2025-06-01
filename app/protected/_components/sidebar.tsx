@@ -7,6 +7,8 @@ import {
   Plus,
   X,
   Trash2,
+  EyeIcon,
+  EyeOffIcon,
 } from "lucide-react";
 import { useState, useEffect, ChangeEvent } from "react";
 import Link from "next/link";
@@ -81,8 +83,10 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
     fetchData();
   }, []);
 
-  const firstSix = projects.slice(0, 6);
-  const remaining = projects.slice(6);
+  const firstSix = projects.slice(0, 5);
+  console.log(firstSix);
+  const remaining = projects.slice(5);
+  console.log(remaining);
 
   const handleDeleteClick = (projectId: string) => {
     console.log(projectId);
@@ -239,9 +243,19 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
           {remaining.length > 0 && (
             <button
               onClick={() => setShowRemaining(!showRemaining)}
-              className="block px-4 py-2 text-sm rounded-lg hover:bg-slate-100 text-purple-600 font-medium"
+              className="flex gap-2 px-4 py-2 text-sm rounded-lg hover:bg-slate-100 text-purple-600 font-medium"
             >
-              {showRemaining ? "Show less" : "View All Projects"}
+              {showRemaining ? (
+                <>
+                  <EyeOffIcon className="w-4 h-4" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <EyeIcon className="w-4 h-4" /> 
+                  View All Projects
+                </>
+              )}
             </button>
           )}
         </div>
