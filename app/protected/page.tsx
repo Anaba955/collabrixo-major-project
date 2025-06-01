@@ -11,6 +11,7 @@ import TaskSummaryCards from "./_components/TaskSummaryCards";
 import Link from "next/link";
 import { Settings } from "lucide-react";
 import BarsWithLine from "./_components/BarsWithLines";
+import { Notification } from "./_components/NotificationPanel";
 
 // Task data interfaces
 interface TaskCounts {
@@ -55,6 +56,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [taskChartData, setTaskChartData] = useState<TaskData[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // State to track window size for responsive components
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -290,6 +292,137 @@ export default function Dashboard() {
 }, []);
 
 
+  // Notification handlers
+  const markAsRead = (id: string | number) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isUnread: false } : n))
+    );
+  };
+  const markAsUnread = (id: string | number) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isUnread: true } : n))
+    );
+  };
+
+  // Real-time notification logic
+  useEffect(() => {
+    let channel: any;
+    let userId: string | null = null;
+    let userProfile: Profile | null = null;
+    let isMounted = true;
+    const supabase = createClient();
+
+    async function fetchUserAndSubscribe() {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+      // Get user profile (for avatar, etc.)
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url")
+        .eq("id", user.id)
+        .single();
+      userProfile = profileData;
+
+      // Initial fetch: get all tasks assigned to this user (for notifications)
+      const { data: tasks } = await supabase
+        .from("tasks")
+        .select("task_id, title, created_by, created_at")
+        .eq("assigned_to", user.id)
+        .order("created_at", { ascending: false });
+      if (tasks && isMounted) {
+        // Fetch assigner names in parallel
+        const assignerIds = Array.from(new Set(tasks.map((t: any) => t.created_by).filter(Boolean)));
+        let assignerMap: Record<string, { name: string; image: string; bgColor: string }> = {};
+        if (assignerIds.length > 0) {
+          const { data: assigners } = await supabase
+            .from("profiles")
+            .select("id, username, email, avatar_url")
+            .in("id", assignerIds);
+          if (assigners) {
+            assigners.forEach((a: any) => {
+              assignerMap[a.id] = {
+                name: a.username || a.email || "Unknown",
+                image: a.avatar_url || "/twitter-image.png",
+                bgColor: "bg-indigo-800",
+              };
+            });
+          }
+        }
+        // Build notifications
+        const notifs: Notification[] = tasks.map((task: any) => {
+          const assigner = assignerMap[task.created_by] || {
+            name: "Unknown",
+            image: "/twitter-image.png",
+            bgColor: "bg-indigo-800",
+          };
+          return {
+            id: task.task_id,
+            user: assigner,
+            action: "assigned you a task:",
+            target: task.title,
+            time: new Date(task.created_at).toLocaleString(),
+            isUnread: true,
+          };
+        });
+        setNotifications(notifs);
+      }
+
+      // Real-time subscription for new tasks assigned to this user
+      channel = supabase
+        .channel("realtime-tasks-notif")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "tasks",
+            filter: `assigned_to=eq.${user.id}`,
+          },
+          async (payload: any) => {
+            const task = payload.new;
+            // Fetch assigner profile
+            let assigner = { name: "Unknown", image: "/twitter-image.png", bgColor: "bg-indigo-800" };
+            if (task.created_by) {
+              const { data: a } = await supabase
+                .from("profiles")
+                .select("username, email, avatar_url")
+                .eq("id", task.created_by)
+                .single();
+              if (a) {
+                assigner = {
+                  name: a.username || a.email || "Unknown",
+                  image: a.avatar_url || "/twitter-image.png",
+                  bgColor: "bg-indigo-800",
+                };
+              }
+            }
+            setNotifications((prev) => [
+              {
+                id: task.task_id,
+                user: assigner,
+                action: "assigned you a task:",
+                target: task.title,
+                time: new Date(task.created_at).toLocaleString(),
+                isUnread: true,
+              },
+              ...prev,
+            ]);
+          }
+        )
+        .subscribe();
+    }
+    fetchUserAndSubscribe();
+    return () => {
+      isMounted = false;
+      if (channel) channel.unsubscribe();
+    };
+  }, []);
+
+  // Calculate unread count
+  const unreadCount = notifications.filter((n) => n.isUnread).length;
+
   // Add event listener to close notifications when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -335,12 +468,15 @@ export default function Dashboard() {
               Dashboard
             </h1>
             <NotificationButton
-              count={3}
+              count={unreadCount}
               onClick={() => setShowNotifications(!showNotifications)}
             />
             <NotificationPanel
               isOpen={showNotifications}
               onClose={() => setShowNotifications(false)}
+              notifications={notifications}
+              markAsRead={markAsRead}
+              markAsUnread={markAsUnread}
             />
           </div>
           <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg max-w-[90vw] md:max-w-none">

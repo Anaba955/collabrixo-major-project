@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-interface NotificationPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-interface Notification {
-  id: number;
+export interface Notification {
+  id: string | number;
   user: {
     name: string;
     image: string;
@@ -19,7 +14,15 @@ interface Notification {
   isUnread: boolean;
 }
 
-const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose }) => {
+interface NotificationPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  notifications: Notification[];
+  markAsRead: (id: string | number) => void;
+  markAsUnread: (id: string | number) => void;
+}
+
+const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose, notifications, markAsRead, markAsUnread }) => {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -32,85 +35,9 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose }
   }, [isOpen]);
 
   const [activeTab, setActiveTab] = useState<'unread' | 'read'>('unread');
-  
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      user: { name: 'Shoaib Asim', image: '/dance.gif', bgColor: 'bg-indigo-800' },
-      action: 'invite you to',
-      target: 'Prototyping',
-      time: 'Today • 23m ago',
-      content: (
-        <div className="mt-2 flex space-x-2">
-          <button className="px-4 py-1 bg-red-500 text-white text-sm font-medium rounded-md">
-            Join
-          </button>
-          <button className="px-4 py-1 bg-gray-800 text-gray-300 text-sm font-medium rounded-md">
-            Decline
-          </button>
-        </div>
-      ),
-      isUnread: true
-    },
-    {
-      id: 2,
-      user: { name: 'Anaba', image: '/dance.gif', bgColor: 'bg-green-800' },
-      action: 'mentioned you in',
-      target: 'UX Basics',
-      time: 'Yesterday',
-      content: (
-        <button className="mt-2 px-4 py-1 bg-red-500 text-white text-sm font-medium rounded-md">
-          Reply now
-        </button>
-      ),
-      isUnread: true
-    },
-    {
-      id: 3,
-      user: { name: 'Anaba', image: '/dance.gif', bgColor: 'bg-pink-800' },
-      action: 'upload a',
-      target: 'Sketch file',
-      time: 'Yesterday',
-      content: (
-        <div className="mt-2 flex items-center px-3 py-2 bg-gray-800 rounded-md w-fit">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M5 2a1 1 0 011-1h8a1 1 0 011 1v10a1 1 0 01-1 1H6a1 1 0 01-1-1V2zm2 1v8h6V3H7z" clipRule="evenodd" />
-            <path d="M4 16a1 1 0 011-1h10a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z" />
-          </svg>
-          <span className="text-sm text-gray-300">social media cover templates</span>
-        </div>
-      ),
-      isUnread: false
-    },
-    {
-      id: 4,
-      user: { name: 'Quadeer', image: '/dance.gif', bgColor: 'bg-blue-800' },
-      action: 'said nothing important',
-      time: '23 May 2024',
-      isUnread: false
-    }
-  ]);
 
   const unreadCount = notifications.filter(n => n.isUnread).length;
   const readCount = notifications.filter(n => !n.isUnread).length;
-
-  // Function to mark notification as read
-  const markAsRead = (id: number) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id ? { ...notification, isUnread: false } : notification
-      )
-    );
-  };
-  
-  // Function to mark notification as unread
-  const markAsUnread = (id: number) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id ? { ...notification, isUnread: true } : notification
-      )
-    );
-  };
 
   if (!isOpen) return null;
   
@@ -206,13 +133,11 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose }
                 </div>
               </div>
             ))}
-            
           {activeTab === 'unread' && unreadCount === 0 && (
             <div className="p-8 text-center text-gray-400">
               <p>No unread notifications</p>
             </div>
           )}
-          
           {activeTab === 'read' && readCount === 0 && (
             <div className="p-8 text-center text-gray-400">
               <p>No read notifications</p>
