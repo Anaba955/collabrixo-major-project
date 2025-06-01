@@ -72,7 +72,7 @@ const features = [
 
 const FeatureSection = () => {
   return (
-    <section className="bg-neutral-950 text-white py-20 px-4">
+    <section className="bg-white dark:bg-neutral-950 dark:text-white py-20 px-4">
       <div className="max-w-6xl mx-auto text-center">
         <h2 className="text-4xl font-bold mb-4">What Makes Collabrixo Awesome</h2>
         <p className="text-neutral-400 mb-12 max-w-2xl mx-auto">
@@ -84,7 +84,7 @@ const FeatureSection = () => {
           {features.map((feature, idx) => (
             <div
               key={idx}
-              className="bg-neutral-900 p-6 rounded-2xl shadow-md hover:shadow-teal-500/30 transition"
+              className="bg-white dark:bg-neutral-950 p-6 rounded-2xl shadow-md hover:shadow-teal-500/30 transition"
             >
               <div className="mb-4">{feature.icon}</div>
               <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>

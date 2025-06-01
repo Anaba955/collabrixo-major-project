@@ -1,25 +1,57 @@
-// app/layout.tsx
+import DeployButton from "@/components/deploy-button";
+import { EnvVarWarning } from "@/components/env-var-warning";
+import HeaderAuth from "@/components/header-auth";
+import { ThemeSwitcher } from "@/components/theme-switcher";
+import { hasEnvVars } from "@/utils/supabase/check-env-vars";
+import { Geist } from "next/font/google";
+import { ThemeProvider } from "next-themes";
+import Link from "next/link";
+import "./globals.css";
 
-import './globals.css';
-import NavbarHeroUI from '@/components/navbar/NavbarHeroUI';
-import { ReactNode } from 'react';
-
-
+const defaultUrl = process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : "http://localhost:3000";
 
 export const metadata = {
-  title: 'My Landing Page',
-  description: 'A beautiful landing page built with Next.js',
+  metadataBase: new URL(defaultUrl),
+  title: "Next.js and Supabase Starter Kit",
+  description: "The fastest way to build apps with Next.js and Supabase",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <body >
-      <NavbarHeroUI />
+const geistSans = Geist({
+  display: "swap",
+  subsets: ["latin"],
+});
 
-        {children}
-        <footer className="bg-neutral-900 text-neutral-400 text-center py-6 mt-10">
-          <p className="text-sm">© 2025 Collabrixo. All rights reserved.</p>  </footer>
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" className={geistSans.className} suppressHydrationWarning>
+      <body className="bg-background text-foreground">
+        <ThemeProvider 
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+         > 
+          <main className="min-h-screen flex flex-col items-center">
+            <div className="flex-1 w-full flex flex-col gap-20 items-center">
+              
+              <div className="flex flex-col gap-20 ">
+                
+                {children}
+              </div>
+
+              <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8">
+                
+               
+              </footer>
+            </div>
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   );
