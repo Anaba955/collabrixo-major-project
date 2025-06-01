@@ -70,6 +70,8 @@ export default function Dashboard() {
 
   // Reference to track clicks outside
   const notificationRef = useRef<HTMLDivElement>(null);
+  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
@@ -409,6 +411,10 @@ export default function Dashboard() {
               },
               ...prev,
             ]);
+            if (notificationAudioRef.current) {
+              notificationAudioRef.current.currentTime = 0;
+              notificationAudioRef.current.play().catch(() => {});
+            }
           }
         )
         .subscribe();
@@ -457,6 +463,20 @@ export default function Dashboard() {
     if (width < 1280) return 800; // Small desktop
     return 900; // Large desktop
   };
+
+  // Prime audio on first user interaction
+  useEffect(() => {
+    notificationAudioRef.current = new Audio('/notification.mp3');
+    const prime = () => {
+      notificationAudioRef.current?.play().then(() => {
+        notificationAudioRef.current?.pause();
+        notificationAudioRef.current!.currentTime = 0;
+      }).catch(() => {});
+      window.removeEventListener('click', prime);
+    };
+    window.addEventListener('click', prime);
+    return () => window.removeEventListener('click', prime);
+  }, []);
 
   return (
     <div className="p-4 md:p-8 lg:p-10 bg-transparent min-h-screen pb-24 max-w-[100vw] overflow-hidden">
