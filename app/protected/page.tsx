@@ -1,15 +1,16 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import PieChart from './_components/PieChart';
-import Heatmap from './_components/Heatmap';
-import NotificationPanel from './_components/NotificationPanel';
-import NotificationButton from './_components/NotificationButton';
-import { createClient } from '@/utils/supabase/client';
-import JeemBackground from './_components/JeemBackground';
-import TaskSummaryCards from './_components/TaskSummaryCards';
-import Link from 'next/link';
-import { Settings } from 'lucide-react';
+import PieChart from "./_components/PieChart";
+import Heatmap from "./_components/Heatmap";
+import NotificationPanel from "./_components/NotificationPanel";
+import NotificationButton from "./_components/NotificationButton";
+import { createClient } from "@/utils/supabase/client";
+import JeemBackground from "./_components/JeemBackground";
+import TaskSummaryCards from "./_components/TaskSummaryCards";
+import Link from "next/link";
+import { Settings } from "lucide-react";
+import BarsWithLine from "./_components/BarsWithLines";
 
 // Task data interfaces
 interface TaskCounts {
@@ -18,6 +19,11 @@ interface TaskCounts {
   inProgress: number;
   done: number;
 }
+
+type Task = {
+  created_at: string;
+  status: "todo" | "inProgress" | "done";
+};
 
 type TaskData = {
   week: string;
@@ -40,6 +46,7 @@ interface Profile {
 
 export default function Dashboard() {
   // State for task data
+  const supabaseClient = createClient();
   const [taskCounts, setTaskCounts] = useState<TaskCounts | null>(null);
   const [pieChartData, setPieChartData] = useState<PieChartItem[] | null>(null);
   const [taskLoading, setTaskLoading] = useState(true);
@@ -47,45 +54,66 @@ export default function Dashboard() {
   // State for user profile data
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [taskChartData, setTaskChartData] = useState<TaskData[]>([]);
 
   // State to track window size for responsive components
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [graphDimensions, setGraphDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
   // State to control notification panel visibility
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Reference to track clicks outside
   const notificationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        setGraphDimensions({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight,
+        });
+      }
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
 
   // Fetch user profile data
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
         const supabase = createClient();
-        
+
         // Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
         if (userError || !user) {
-          throw new Error('User not found');
+          throw new Error("User not found");
         }
-        
+
         // Get user profile from profiles table
         const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url')
-          .eq('id', user.id)
+          .from("profiles")
+          .select("id, username, avatar_url")
+          .eq("id", user.id)
           .single();
-          
+
         if (!profileError && profileData) {
           setProfile(profileData);
         }
-        
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error("Error fetching user profile:", error);
         setLoading(false);
       }
     };
-    
+
     fetchUserProfile();
   }, []);
 
@@ -110,7 +138,6 @@ export default function Dashboard() {
             p_user_id: user.id,
           }
         );
-
         if (error) throw error;
 
         if (data && Array.isArray(data)) {
@@ -188,29 +215,80 @@ export default function Dashboard() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-  const taskChartData: TaskData[] = [
-    {
-      week: "Week 1",
-      todo: 5,
-      inProgress: 3,
-      done: 2,
-      totalTasks: 10,
-    },
-    {
-      week: "Week 2",
-      todo: 2,
-      inProgress: 4,
-      done: 4,
-      totalTasks: 10,
-    },
-    {
-      week: "Week 3",
-      todo: 1,
-      inProgress: 2,
-      done: 7,
-      totalTasks: 10,
-    },
-  ];
+
+
+ useEffect(() => {
+  function getWeekOfMonth(date: Date): number {
+    const start = new Date(date.getFullYear(), date.getMonth(), 1);
+    const day = date.getDate();
+    const startDay = start.getDay(); // Sunday = 0
+    return Math.ceil((day + startDay) / 7);
+  }
+
+  function countTasksPerWeekByStatus(tasks: Task[]): TaskData[] {
+    const result: Record<
+      number,
+      { todo: number; inProgress: number; done: number }
+    > = {
+      1: { todo: 0, inProgress: 0, done: 0 },
+      2: { todo: 0, inProgress: 0, done: 0 },
+      3: { todo: 0, inProgress: 0, done: 0 },
+      4: { todo: 0, inProgress: 0, done: 0 },
+      5: { todo: 0, inProgress: 0, done: 0 },
+    };
+
+    tasks.forEach((task) => {
+      if (!task.created_at) return;
+
+      const date = new Date(task.created_at);
+      if (isNaN(date.getTime())) return;
+
+      const week = getWeekOfMonth(date);
+      if (!result[week]) {
+        result[week] = { todo: 0, inProgress: 0, done: 0 };
+      }
+
+      if (task.status === "todo") result[week].todo += 1;
+      else if (task.status === "inProgress") result[week].inProgress += 1;
+      else if (task.status === "done") result[week].done += 1;
+    });
+
+    const formatted: TaskData[] = Object.entries(result).map(
+      ([week, counts]) => ({
+        week: `Week ${week}`,
+        ...counts,
+        totalTasks: counts.todo + counts.inProgress + counts.done,
+      })
+    );
+
+    return formatted;
+  }
+
+  const getData = async () => {
+    const { data: userData, error: userError } =
+      await supabaseClient.auth.getUser();
+    if (userError || !userData.user) {
+      console.log("Error fetching current user", userError);
+      return;
+    }
+
+    const { data: tasks, error } = await supabaseClient
+      .from("tasks")
+      .select("status, created_at")
+      .eq("assigned_to", userData.user.id);
+
+    if (error) {
+      console.log("Error fetching data for bar graph", error);
+      return;
+    }
+
+    const taskChartData: TaskData[] = countTasksPerWeekByStatus(tasks);
+    setTaskChartData(taskChartData);
+  };
+
+  getData();
+}, []);
+
 
   // Add event listener to close notifications when clicking outside
   useEffect(() => {
@@ -266,24 +344,29 @@ export default function Dashboard() {
             />
           </div>
           <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg max-w-[90vw] md:max-w-none">
-            Welcome back, <span className="font-semibold">
-              {profile?.username || "User"}</span>
+            Welcome back,{" "}
+            <span className="font-semibold">{profile?.username || "User"}</span>
           </p>
         </div>
 
         <div className="flex items-center space-x-4 w-full md:w-auto justify-end">
           <div className="bg-white/70 backdrop-blur-lg dark:bg-gray-800 px-3 sm:px-4 py-2 rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] border-2 border-black dark:border-white flex items-center gap-2">
-            <Link href="/protected/profile" className="hover:text-blue-500 transition-colors">
+            <Link
+              href="/protected/profile"
+              className="hover:text-blue-500 transition-colors"
+            >
               <Settings className="h-4 w-4" />
             </Link>
-            <span className="font-bold text-sm sm:text-base">{profile?.username || "User"}</span>
+            <span className="font-bold text-sm sm:text-base">
+              {profile?.username || "User"}
+            </span>
           </div>
           <div className="h-16 w-16 sm:h-16 sm:w-16 rounded-md bg-black dark:bg-white shadow-[4px_4px_0px_0px_rgba(128,128,128,1)] overflow-hidden border-2 border-black dark:border-white flex-shrink-0">
             <div className="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 w-full h-full">
-              <img 
-                src={profile?.avatar_url || "/dance.gif"} 
-                alt={profile?.username || "User"} 
-                className="w-full h-full object-cover" 
+              <img
+                src={profile?.avatar_url || "/twitter-image.png"}
+                alt={profile?.username || "User"}
+                className="w-full h-full object-cover"
               />
             </div>
           </div>
@@ -312,19 +395,17 @@ export default function Dashboard() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6">
+          <CardContent ref={containerRef} className="p-4 sm:p-6 m-6">
             <div className="h-64 sm:h-[300px] flex items-center justify-center bg-gradient-to-r from-gray-50/90 to-gray-100/90 dark:from-gray-900/20 dark:to-gray-800/20 rounded-md border-2 border-dashed border-black dark:border-gray-700">
               {/* This is a placeholder for the Progress Graph component */}
-              {/* <BarsWithLine
-                width={600}
-                height={400}
-                data={taskChartData}
-                events={true}
-                onStatusChange={(status) => console.log("Status:", status)}
-              /> */}
-              <p className="text-gray-500 dark:text-gray-400 font-mono text-sm">
-                Progress Graph Component Placeholder
-              </p>
+              {taskChartData.length > 0 && graphDimensions.width > 0 && graphDimensions.height > 0 && (
+                <BarsWithLine
+                  width={graphDimensions.width}
+                  height={graphDimensions.height}
+                  data={taskChartData}
+                  events={true}
+                />
+              )}
             </div>
           </CardContent>
         </Card>

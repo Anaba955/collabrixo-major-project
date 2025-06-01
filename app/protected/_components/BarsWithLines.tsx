@@ -88,7 +88,7 @@ export default function BarsWithLine({
   const validData = useMemo(() => {
     return Array.isArray(data) ? data.filter(d => d && typeof d === 'object') : [];
   }, [data]);
-  
+  console.log("width",width)
   const [taskStatus, setTaskStatus] = useState<TaskStatus>('all');
   
   const {

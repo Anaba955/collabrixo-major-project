@@ -34,18 +34,18 @@ export default function TabsSection() {
               >
                 <BoardContent/>
               </TabsContent>
-              <TabsContent
+              {/* <TabsContent
                 value="calendar"
                 className="w-full min-h-[500px] rounded-lg px-2"
               >
                 Calendar will go here.
-              </TabsContent>
-              <TabsContent
+              </TabsContent> */}
+              {/* <TabsContent
                 value="chat"
                 className="w-full min-h-[500px] rounded-lg px-2"
               >
                 Team chat will go here.
-              </TabsContent>
+              </TabsContent> */}
               <TabsContent
                 value="activity"
                 className="w-full min-h-[500px] rounded-lg px-2"

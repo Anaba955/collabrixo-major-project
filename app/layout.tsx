@@ -31,25 +31,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={geistSans.className} suppressHydrationWarning>
       <body className="bg-background text-foreground">
-        <ThemeProvider 
+        <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
-         > 
-          <main className="min-h-screen flex flex-col items-center">
-            <div className="flex-1 w-full flex flex-col gap-20 items-center">
-              
-              <div className="flex flex-col gap-20 ">
-                
-                {children}
-              </div>
-
-              <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8">
-                
-               
-              </footer>
-            </div>
+        >
+          <main className="min-h-screen flex flex-col">
+            <div className="flex-1 w-full flex flex-col gap-20">{children}</div>
           </main>
         </ThemeProvider>
       </body>
