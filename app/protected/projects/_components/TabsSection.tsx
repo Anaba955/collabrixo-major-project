@@ -13,14 +13,14 @@ export default function TabsSection() {
                 <LayoutDashboard className="w-4 h-4 text-purple-600" />
                 <span className="sm:inline text-purple-600 md:text-xl lg:text-base">Kanban</span>
               </TabsTrigger>
-              <TabsTrigger value="calendar" className="flex items-center gap-2">
+              {/* <TabsTrigger value="calendar" className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-purple-600" />
                 <span className="sm:inline text-purple-600 md:text-xl lg:text-base">Calendar</span>
               </TabsTrigger>
               <TabsTrigger value="chat" className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-purple-600" />
                 <span className="sm:inline text-purple-600 md:text-xl lg:text-base">Team Chat</span>
-              </TabsTrigger>
+              </TabsTrigger> */}
               <TabsTrigger value="activity" className="flex items-center gap-2">
                 <Github className="w-4 h-4 text-purple-600" />
                 <span className="sm:inline text-purple-600 md:text-xl lg:text-base">Github Activity</span>
