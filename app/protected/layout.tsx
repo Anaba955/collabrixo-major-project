@@ -1,6 +1,7 @@
 
 
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,8 +30,11 @@ export default function Layout({
 
   const projectIdFromUrl = params?.projectId;
 
-  const toggleSidebar = () => setIsCollapsed((prev) => !prev);
-
+//   const toggleSidebar = () => setIsCollapsed((prev) => !prev);
+   const toggleSidebar = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+    
   useEffect(() => {
     if (!projectIdFromUrl) {
       console.warn("No project ID in URL.");
@@ -130,7 +134,7 @@ export default function Layout({
         </div>
       </nav>
 
-      <div className="flex flex-1">
+<!--       <div className="flex flex-1">
         <div
           className={`$${
             isCollapsed ? "w-56 md:w-60 lg:w-72" : "w-0"
@@ -140,7 +144,29 @@ export default function Layout({
         </div>
 
         <main className="flex-1 px-4 transition-all duration-300">{children}</main>
+      </div> -->
+      
+      {/* Sidebar Overlay & Content */}
+    <div className="relative flex-1">
+      {isCollapsed && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-20"
+            onClick={toggleSidebar}
+          />
+          {/* Sidebar */}
+          <div className="fixed top-16 left-0 w-64 h-[calc(100vh-4rem)] bg-white shadow-lg z-30">
+            <Sidebar isCollapsed={isCollapsed} />
+          </div>
+        </>
+      )}
+
+      {/* Main Content */}
+      <div className="relative z-10">
+        {children}
       </div>
     </div>
+      
+    </div>
   );
-}

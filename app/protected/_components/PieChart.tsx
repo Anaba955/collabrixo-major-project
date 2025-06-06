@@ -1,9 +1,16 @@
 "use client";
-import React, { useState } from 'react';
+
+
+
+import React, { useState, useEffect, useCallback } from 'react';
 import Pie from '@visx/shape/lib/shapes/Pie';
 import { scaleOrdinal } from '@visx/scale';
 import { Group } from '@visx/group';
 import { ChevronDown } from 'lucide-react';
+
+import { createClient } from "@/utils/supabase/client";
+import { RealtimeChannel } from '@supabase/supabase-js';
+
 
 export interface PieChartItem {
   name: string;
@@ -33,7 +40,9 @@ const defaultMargin = { top: 50, right: 20, bottom: 20, left: 20 };
 export interface PieChartProps {
   width: number;
   height: number;
-  data: PieChartItem[];
+
+  initialData?: PieChartItem[];
+
   margin?: typeof defaultMargin;
   colors?: string[];
   innerRadius?: number; 
@@ -44,7 +53,9 @@ export interface PieChartProps {
 export default function PieChart({
   width,
   height,
-  data,
+
+  initialData,
+
   margin = defaultMargin,
   colors = defaultColors,
   innerRadius = 0, 
@@ -52,8 +63,160 @@ export default function PieChart({
   cornerRadius = 3,
 }: PieChartProps) {
   const [viewMode, setViewMode] = useState<'normal' | 'advanced'>('normal');
+
+  const [data, setData] = useState<PieChartItem[]>(initialData || []);
+  const [isLoading, setIsLoading] = useState(!initialData);
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  // Function to fetch and calculate chart data
+  const fetchChartData = useCallback(async (userId: string) => {
+    if (!userId) return;
+    
+    try {
+      const supabase = createClient();
+      
+      // Fetch all tasks assigned to current user
+      const { data: allTasks, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('assigned_to', userId);
+      
+      if (error) {
+        console.error('Error fetching tasks for pie chart:', error);
+        throw error;
+      }
+      
+      // Make sure we have an array even if no data was returned
+      const tasks = allTasks || [];
+      
+      // Count tasks by status
+      const todoCount = tasks.filter(task => task.status === 'todo').length;
+      const inProgressCount = tasks.filter(task => task.status === 'inProgress').length;
+      const doneCount = tasks.filter(task => task.status === 'done').length;
+      
+      // Format data for pie chart
+      const chartData: PieChartItem[] = [
+        { name: 'To Do', value: todoCount },
+        { name: 'In Progress', value: inProgressCount },
+        { name: 'Done', value: doneCount }
+      ];
+      
+      console.log('Pie chart data updated:', chartData);
+      setData(chartData);
+      setIsLoading(false);
+      
+    } catch (error) {
+      console.error('Error calculating pie chart data:', error);
+      setIsLoading(false);
+    }
+  }, []);
+  
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+      setIsLoading(false);
+      return;
+    }
+    
+    let realtimeChannel: RealtimeChannel;
+    
+    const setupRealtimeAndFetchInitial = async () => {
+      try {
+        const supabase = createClient();
+        
+        // Get the current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error("User not authenticated");
+          setIsLoading(false);
+          return;
+        }
+        
+        setUserId(user.id);
+        
+        // Initial data fetch
+        await fetchChartData(user.id);
+        
+        // Set up realtime subscription and I separated events coz * wasn't working will check later if possible 
+        realtimeChannel = supabase
+          .channel('pie-chart-tasks-changes')
+          .on('postgres_changes', 
+            { 
+              event: 'INSERT', 
+              schema: 'public', 
+              table: 'tasks',
+              filter: `assigned_to=eq.${user.id}`
+            }, 
+            (payload) => {
+              console.log('Task inserted (pie chart):', payload);
+              fetchChartData(user.id);
+            }
+          )
+          .on('postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'tasks'
+            },
+            (payload) => {
+              console.log('Task updated (pie chart):', payload);
+              fetchChartData(user.id);
+            }
+          )
+          .on('postgres_changes',
+            {
+              event: 'DELETE',
+              schema: 'public',
+              table: 'tasks'
+            },
+            (payload) => {
+              console.log('Task deleted (pie chart):', payload);
+              fetchChartData(user.id);
+            }
+          )
+          .subscribe((status) => {
+            console.log('Pie chart realtime subscription status:', status);
+          });
+        
+      } catch (error) {
+        console.error('Error setting up pie chart realtime:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    setupRealtimeAndFetchInitial();
+    
+    // Cleanup function
+    return () => {
+      const supabase = createClient();
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
+  }, [fetchChartData]);
   
   if (width < 10) return null;
+  
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="animate-spin w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+  
+  // If we have no data or all zeros, show a message
+  const hasData = data.some(item => item.value > 0);
+  if (!hasData) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-center text-gray-500 dark:text-gray-400">
+          <p className="text-lg font-bold">No tasks found</p>
+          <p className="text-sm">Create tasks to see your distribution</p>
+        </div>
+      </div>
+    );
+  }
 
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;

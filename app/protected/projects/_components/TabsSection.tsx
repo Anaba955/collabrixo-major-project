@@ -4,6 +4,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Github, LayoutDashboard, MessageSquare, CalendarDays } from "lucide-react";
 import BoardContent from "./ui/BoardContent";
 import { useParams } from "next/navigation";
@@ -11,6 +12,9 @@ import TeamChat from "@/components/Tchat";
 import ProjectCalendarPage from "@/components/ProjectCalendarPage";
 import { createClient } from "@/utils/supabase/client"; // Updated import
 import { User } from "@supabase/supabase-js";
+
+import GithubActivity from "./GithubActivity";
+
 
 export default function TabsSection() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -249,6 +253,7 @@ export default function TabsSection() {
   // Access denied
   if (!hasAccess) {
     return (
+
       <div className="text-center p-8">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-yellow-800 mb-2">Access Denied</h2>
@@ -315,7 +320,9 @@ export default function TabsSection() {
           <TabsContent value="activity" className="w-full min-h-[500px] rounded-lg px-2">
             <div className="text-center p-8 text-gray-500">
               <Github className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Github activity will go here.</p>
+              <GithubActivity />
+
+       
             </div>
           </TabsContent>
         </div>

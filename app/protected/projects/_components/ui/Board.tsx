@@ -1,13 +1,21 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
-import { Calendar, PlusCircle, X, ChevronDown, Plus, Trash } from 'lucide-react';
-import Image from 'next/image';
+import { useState, useEffect, useRef } from "react";
+import {
+  Calendar,
+  PlusCircle,
+  X,
+  ChevronDown,
+  Plus,
+  Trash,
+} from "lucide-react";
+import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
+import { usePathname } from "next/navigation";
 
 // Task interface
 export interface Task {
   task_id: string;
-  project_id:string;
+  project_id: string;
   title: string;
   description: string;
   status: string;
@@ -52,6 +60,16 @@ interface BoardProps {
 const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   // Reference for keeping track of the next task ID counter
   const supabaseClient = createClient();
+
+
+  const pathname = usePathname();
+  const pathParts = pathname.split("/");
+  const projectId = pathParts[pathParts.length - 1];
+  const [id, setId] = useState<string | null>(null);
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({});
+
+  // const [assignedId, setAssignedId] = useState<string | null>(null);
+
   // const channels = supabaseClient.channel('custom-all-channel')
   // .on(
   //   'postgres_changes',
@@ -62,40 +80,40 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   // )
   // .subscribe()
   const taskIdCounterRef = useRef(initialTasks.length + 1);
-  
+
   // State to manage the form modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTask, setNewTask] = useState<TaskFormData>({
-    title: '',
-    description: '',
-    status: 'todo',
+    title: "",
+    description: "",
+    status: "todo",
     created_at: new Date().toISOString(),
-    created_by: '',
-    assigned_to: '',
+    created_by: "",
+    assigned_to: "",
   });
 
   // State to manage columns
   const [columns, setColumns] = useState<Record<string, Column>>({
     todo: {
-      id: 'todo',
-      title: 'To Do',
-      tasks: []
+      id: "todo",
+      title: "To Do",
+      tasks: [],
     },
     inProgress: {
-      id: 'inProgress',
-      title: 'In Progress',
-      tasks: []
+      id: "inProgress",
+      title: "In Progress",
+      tasks: [],
     },
     done: {
-      id: 'done',
-      title: 'Done',
-      tasks: []
-    }
+      id: "done",
+      title: "Done",
+      tasks: [],
+    },
   });
-  
+
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-  const columnOrder = ['todo', 'inProgress', 'done'];
-  
+  const columnOrder = ["todo", "inProgress", "done"];
+
   // State for the currently selected column on mobile
   const [selectedColumn, setSelectedColumn] = useState<string>(columnOrder[0]);
 
@@ -104,40 +122,94 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editedTask, setEditedTask] = useState<Partial<Task>>({});
   const [newComment, setNewComment] = useState("");
-  const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
+  const [taskComments, setTaskComments] = useState<
+    Record<string, TaskComment[]>
+  >({});
 
   // State for mobile dropdown
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Add this near the other state variables (around line 90)
   const [deadlineDays, setDeadlineDays] = useState<number>(7);
+  const currentUserId = async () => {
+    const { data, error } = await supabaseClient.auth.getUser();
+    if (error) {
+      console.error("Error fetching user:", error);
+      return null;
+    }
 
+    return data?.user?.id ?? null;
+  };
+
+  const fetchEmail = async (id: string) => {
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .select("email")
+      .eq("id", id)
+      .single();
+    if (error) {
+      console.error("Error fecthing email", error.message);
+    }
+    return data?.email ?? null;
+  };
   // Initialize tasks from props
   useEffect(() => {
     if (initialTasks.length > 0) {
       // Check if we already have tasks added (to prevent duplicate initialization in Strict Mode)
       const totalCurrentTasks = Object.values(columns).reduce(
-        (total, column) => total + column.tasks.length, 
+        (total, column) => total + column.tasks.length,
         0
       );
-      
+
       // Only initialize if we don't already have tasks
       if (totalCurrentTasks === 0) {
         const updatedColumns = { ...columns };
 
-        initialTasks.forEach(task => {
+        initialTasks.forEach((task) => {
           updatedColumns[task.status].tasks.push(task);
         });
 
         setColumns(updatedColumns);
       }
     }
+
+    const getUserId = async () => {
+      const userId = await currentUserId();
+      setId(userId);
+    };
+
+    getUserId();
+
+    const fetchAllEmails = async () => {
+      const userIds = Array.from(
+        new Set(
+          initialTasks
+            .map((task) => task.created_by)
+            .filter((id): id is string => typeof id === "string")
+        )
+      );
+
+      const emailsMap: Record<string, string> = {};
+
+      await Promise.all(
+        userIds.map(async (userId) => {
+          const email = await fetchEmail(userId);
+          if (email) emailsMap[userId] = email;
+        })
+      );
+
+      setUserEmails(emailsMap);
+    };
+
+    if (initialTasks.length > 0) {
+      fetchAllEmails();
+    }
   }, [initialTasks]);
 
   // Handle drag start
   const handleDragStart = (e: React.DragEvent, task: Task) => {
-    e.dataTransfer.setData('taskId', task.task_id);
-    e.dataTransfer.setData('sourceColumnId', task.status);
+    e.dataTransfer.setData("taskId", task.task_id);
+    e.dataTransfer.setData("sourceColumnId", task.status);
     setDraggedTask(task);
   };
 
@@ -147,82 +219,116 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   };
 
   // Handle drop
-  const handleDrop = (e: React.DragEvent, columnId: string) => {
+  const handleDrop = async (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
-    
-    if (!draggedTask) return;
 
+    if (!draggedTask) return;
+    if (!(draggedTask.assigned_to === id || draggedTask.created_by === id)) {
+      return;
+    }
     // Source column
     const sourceColumn = columns[draggedTask.status];
     // Remove from source column
-    const updatedSourceTasks = sourceColumn.tasks.filter(task => task.task_id !== draggedTask.task_id);
-    
+    const updatedSourceTasks = sourceColumn.tasks.filter(
+      (task) => task.task_id !== draggedTask.task_id
+    );
+
     // Update task's status
-    const updatedTask = { ...draggedTask, status: columnId as 'todo' | 'inProgress' | 'done' };
-    
+    const updatedTask = {
+      ...draggedTask,
+      status: columnId as "todo" | "inProgress" | "done",
+    };
+
     // Add to destination column
     const updatedColumns = {
       ...columns,
       [sourceColumn.id]: {
         ...sourceColumn,
-        tasks: updatedSourceTasks
+        tasks: updatedSourceTasks,
       },
       [columnId]: {
         ...columns[columnId],
-        tasks: [...columns[columnId].tasks, updatedTask]
-      }
+        tasks: [...columns[columnId].tasks, updatedTask],
+      },
     };
-    
+
     setColumns(updatedColumns);
     setDraggedTask(null);
+
+    const { error } = await supabaseClient
+      .from("tasks")
+      .update({ status: columnId })
+      .eq("task_id", draggedTask.task_id);
+
+    if (error) {
+      console.error("Error updating task status:", error.message);
+      // Optionally show an alert or revert UI change
+    }
   };
 
   // Handle showing the add task modal
   const handleAddTask = () => {
     setIsModalOpen(true);
   };
-  
+
   // Handle submitting the new task form
   const handleSubmitTask = async (e: any) => {
+    e.preventDefault();
+
     if (!newTask.title) return;
-    
-    const task: Task = {
-      task_id: "7f9c8b3e-2f63-41e5-bc1d-b2e9c41d57a5",
-      project_id:'3c449004-8b64-49cf-8660-cee0efc7371a',
-      title: newTask.title,
-      description: newTask.description,
-      status: newTask.status,
-      created_at: new Date().toISOString(),
-      created_by: newTask.created_by || 'Anonymous',
-      assigned_to: newTask.assigned_to,
-      deadline: newTask.deadline
-    };
-    console.log(task)
-    setColumns(prev => {
-      const targetColumn = prev[task.status];
+
+    const { data, error: fetchIdError } = await supabaseClient
+      .from("profiles")
+      .select("id")
+      .eq("email", newTask.assigned_to)
+      .single();
+
+    if (fetchIdError || !data) {
+      console.error("Error fetching email", fetchIdError?.message || "No data");
+      return;
+    }
+
+    const assignedId = data.id;
+    const { data: insertedTask, error } = await supabaseClient
+      .from("tasks")
+      .insert([
+        {
+          project_id: projectId,
+          title: newTask.title,
+          description: newTask.description,
+          status: newTask.status,
+          created_by: id,
+          assigned_to: assignedId,
+          deadline: newTask.deadline,
+        },
+      ])
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("Error inserting task:", error.message);
+      return;
+    }
+
+    setColumns((prev) => {
+      const targetColumn = prev[insertedTask.status];
       return {
         ...prev,
-        [task.status]: {
+        [insertedTask.status]: {
           ...targetColumn,
-          tasks: [...targetColumn.tasks, task]
-        }
+          tasks: [...targetColumn.tasks, insertedTask],
+        },
       };
     });
-    
-    const { error } = await supabaseClient.from("tasks").insert(task)
-    if( error ) {
-      console.error("Error adding task: ", error.message)
-    }
     // Reset form
     setNewTask({
-      title: '',
-      description: '',
-      status: 'todo',
+      title: "",
+      description: "",
+      status: "todo",
       created_at: new Date().toISOString(),
-      created_by: '',
-      assigned_to: '',
+      assigned_to: "",
     });
-    
+
     setIsModalOpen(false);
   };
 
@@ -237,58 +343,101 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
     // Get random background color based on name
     const getColorFromName = (name: string) => {
       const colors = [
-        'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 
-        'bg-red-500', 'bg-purple-500', 'bg-pink-500',
-        'bg-indigo-500', 'bg-teal-500', 'bg-orange-500'
+        "bg-blue-500",
+        "bg-green-500",
+        "bg-yellow-500",
+        "bg-red-500",
+        "bg-purple-500",
+        "bg-pink-500",
+        "bg-indigo-500",
+        "bg-teal-500",
+        "bg-orange-500",
       ];
-      
+
       // Hash the name to a consistent number
       let hash = 0;
       for (let i = 0; i < name.length; i++) {
         hash = name.charCodeAt(i) + ((hash << 5) - hash);
       }
-      
+
       // Use the hash to pick a color
       return colors[Math.abs(hash) % colors.length];
     };
-    
+
     return (
-      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${getColorFromName(name)} text-white text-xs font-bold border border-black`}>
+      <div
+        className={`w-6 h-6 rounded-full flex items-center justify-center ${getColorFromName(name)} text-white text-xs font-bold border border-black`}
+      >
         {name.charAt(0).toUpperCase()}
       </div>
     );
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value } = e.target;
-    setNewTask(prev => ({
+    setNewTask((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   // Add a new function to handle task deletion
-  const handleDeleteTask = (taskId: string, columnId: string) => {
-    setColumns(prevColumns => {
+  const handleDeleteTask = async (taskId: string, columnId: string) => {
+    console.log(taskId);
+    const { data, error } = await supabaseClient
+      .from("tasks")
+      .delete()
+      .eq("task_id", taskId)
+      .select();
+    if (error) {
+      console.log("Error while deleting the task", error.message);
+      return;
+    }
+    console.log("row deleted", data);
+
+    setColumns((prevColumns) => {
       const updatedColumns = { ...prevColumns };
       updatedColumns[columnId].tasks = updatedColumns[columnId].tasks.filter(
-        task => task.task_id !== taskId
+        (task) => task.task_id !== taskId
       );
       return updatedColumns;
     });
+    setIsDetailModalOpen(false);
   };
 
   // Handle task click
-  const handleTaskClick = (task: Task) => {
+  const handleTaskClick = async (task: Task) => {
     // Calculate days until deadline if there's a deadline set
     const taskWithDays: Task = { ...task };
     if (task.deadline) {
       taskWithDays.deadlineDays = getDaysUntilDeadline(task.deadline);
     }
-    
+
     setSelectedTask(taskWithDays);
     setEditedTask(taskWithDays);
     setIsDetailModalOpen(true);
+
+    const { data, error } = await supabaseClient
+      .from("tasks")
+      .select("comments")
+      .eq("task_id", task.task_id)
+      .single();
+
+    if (error) {
+      console.error("Failed to fetch comments:", error.message);
+      return;
+    }
+
+    const comments = Array.isArray(data.comments) ? data.comments : [];
+
+    setTaskComments((prev) => ({
+      ...prev,
+      [task.task_id]: comments,
+    }));
   };
 
   // Handle closing the detail modal
@@ -299,87 +448,139 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   };
 
   // Handle task update
-  const handleTaskUpdate = () => {
-    if (!selectedTask || !editedTask.title) return;
-    
+  const handleTaskUpdate = async () => {
+    if (!selectedTask) return;
+
     // If deadlineDays is set, calculate the new deadline date
     if (deadlineDays) {
       const today = new Date();
       const futureDate = new Date();
       futureDate.setDate(today.getDate() + deadlineDays);
-      editedTask.deadline = futureDate.toISOString().split('T')[0];
+      editedTask.deadline = futureDate.toISOString().split("T")[0];
     }
-    
-    // Find task and update it
+
+    const updatedTask = { ...selectedTask, ...editedTask } as Task;
+
+    const { error } = await supabaseClient
+      .from("tasks")
+      .update({
+        title: updatedTask.title,
+        description: updatedTask.description,
+        status: updatedTask.status,
+        deadline: updatedTask.deadline,
+      })
+      .eq("task_id", selectedTask.task_id);
+
+    if (error) {
+      console.error("Error updating task:", error.message);
+      return;
+    }
+
     const updatedColumns = { ...columns };
-    const columnId = selectedTask.status;
-    
-    updatedColumns[columnId].tasks = updatedColumns[columnId].tasks.map(task => {
-      if (task.task_id === selectedTask.task_id) {
-        return { ...task, ...editedTask } as Task;
-      }
-      return task;
-    });
-    
-    // If status changed, move task to the new column
-    if (editedTask.status && editedTask.status !== selectedTask.status) {
-      // Remove from old column
-      updatedColumns[columnId].tasks = updatedColumns[columnId].tasks.filter(
-        task => task.task_id !== selectedTask.task_id
+    const oldColumnId = selectedTask.status;
+    const newColumnId = updatedTask.status || oldColumnId;
+
+    if (oldColumnId !== newColumnId) {
+      updatedColumns[oldColumnId].tasks = updatedColumns[
+        oldColumnId
+      ].tasks.filter((task) => task.task_id !== selectedTask.task_id);
+      updatedColumns[newColumnId].tasks.push(updatedTask);
+    } else {
+      updatedColumns[oldColumnId].tasks = updatedColumns[oldColumnId].tasks.map(
+        (task) => (task.task_id === selectedTask.task_id ? updatedTask : task)
       );
-      
-      // Add to new column
-      const updatedTask = { ...selectedTask, ...editedTask } as Task;
-      updatedColumns[editedTask.status].tasks.push(updatedTask);
     }
-    
+
     setColumns(updatedColumns);
     setIsDetailModalOpen(false);
     setSelectedTask(null);
     setEditedTask({});
   };
 
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 60) return "just now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hrs ago`;
+    if (seconds < 172800) return "Yesterday";
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   // Handle comment submission
-  const handleCommentSubmit = () => {
+  const handleCommentSubmit = async () => {
     if (!selectedTask || !newComment.trim()) return;
-    
+
     const commentId = `comment-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const comment: TaskComment = {
       id: commentId,
-      author: "Current User",
-      content: newComment,
-      created_at: new Date().toISOString()
+      author: id || "",
+      content: newComment.trim(),
+      created_at: new Date().toISOString(),
     };
-    
-    setTaskComments(prev => ({
+
+    setTaskComments((prev) => ({
       ...prev,
-      [selectedTask.task_id]: [...(prev[selectedTask.task_id] || []), comment]
+      [selectedTask.task_id]: [...(prev[selectedTask.task_id] || []), comment],
     }));
-    
+
+    const { data: taskComments, error } = await supabaseClient
+      .from("tasks")
+      .select("comments")
+      .eq("task_id", selectedTask.task_id)
+      .single();
+
+    if (error) {
+      console.log("Error fetching comment", error.message);
+      return;
+    }
+    console.log(taskComments);
+    const existingComments = Array.isArray(taskComments.comments)
+      ? taskComments?.comments
+      : [];
+    const updatedComments = [...existingComments, comment];
+    console.log(updatedComments);
+
+    const { error: updateCommentError } = await supabaseClient
+      .from("tasks")
+      .update({ comments: updatedComments })
+      .eq("task_id", selectedTask.task_id);
+
+    if (updateCommentError) {
+      console.log("Error while updating comment", updateCommentError.message);
+    }
+
     setNewComment("");
   };
 
   // Function to format dates in a more readable way
   const formatDate = (dateString?: string) => {
-    if (!dateString) return 'No date set';
+    if (!dateString) return "No date set";
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   };
 
   // Helper function to calculate days until deadline
   const getDaysUntilDeadline = (deadline?: string) => {
     if (!deadline) return null;
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const deadlineDate = new Date(deadline);
     deadlineDate.setHours(0, 0, 0, 0);
-    
+
     const differenceMs = deadlineDate.getTime() - today.getTime();
     return Math.ceil(differenceMs / (1000 * 60 * 60 * 24));
   };
@@ -387,24 +588,25 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   // Function to render deadline with appropriate color
   const renderDeadline = (task: Task) => {
     if (!task.deadline) return null;
-    
+
     const daysUntil = getDaysUntilDeadline(task.deadline);
-    
-    let colorClass = 'text-gray-500';
+
+    let colorClass = "text-gray-500";
     if (daysUntil !== null) {
       if (daysUntil < 0) {
-        colorClass = 'text-red-600 font-bold';
+        colorClass = "text-red-600 font-bold";
       } else if (daysUntil <= 3) {
-        colorClass = 'text-amber-600 font-bold';
+        colorClass = "text-amber-600 font-bold";
       } else if (daysUntil <= 7) {
-        colorClass = 'text-blue-600';
+        colorClass = "text-blue-600";
       }
     }
-    
+
     return (
       <div className={`text-sm ${colorClass}`}>
-        {daysUntil !== null && daysUntil < 0 ? 'Overdue by ' : 'Due in '}
-        {daysUntil !== null && Math.abs(daysUntil)} {daysUntil !== null && Math.abs(daysUntil) === 1 ? 'day' : 'days'}
+        {daysUntil !== null && daysUntil < 0 ? "Overdue by " : "Due in "}
+        {daysUntil !== null && Math.abs(daysUntil)}{" "}
+        {daysUntil !== null && Math.abs(daysUntil) === 1 ? "day" : "days"}
       </div>
     );
   };
@@ -413,15 +615,17 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   const getColumnName = (columnId: string): string => {
     return columns[columnId]?.title || columnId;
   };
+  const canEditTask =
+    selectedTask?.assigned_to === id || selectedTask?.created_by === id;
 
   return (
     <div className="relative w-full h-full overflow-hidden">
       {/* Background gradient */}
       {/* <div className="absolute inset-0 bg-gradient-to-br from-emerald-300 to-lime-200 dark:from-emerald-900 dark:to-lime-800 opacity-30 dark:opacity-20 -z-10"></div> */}
-      
+
       {/* Grid pattern overlay */}
       {/* <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] -z-10"></div> */}
-      
+
       <div className="p-6">
         {/* Header section */}
         <div className="flex justify-between items-center mb-6 ml-auto">
@@ -440,20 +644,23 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
 
         {/* Mobile view with dropdown */}
         <div className="md:hidden w-full">
-          <div 
+          <div
             className="flex items-center justify-between p-3 mb-4 bg-white dark:bg-gray-800 rounded-lg shadow-md cursor-pointer border-3 border-black dark:border-gray-700"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             <span className="font-semibold">
               {columns[selectedColumn].title}
             </span>
-            <ChevronDown size={20} className={`transform transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              size={20}
+              className={`transform transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+            />
           </div>
-          
+
           {isDropdownOpen && (
             <div className="absolute z-10 w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg border-2 border-black dark:border-gray-700 mb-4">
-              {columnOrder.map(columnId => (
-                <div 
+              {columnOrder.map((columnId) => (
+                <div
                   key={columnId}
                   className="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
                   onClick={() => {
@@ -466,14 +673,16 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
               ))}
             </div>
           )}
-          
+
           <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm p-4 rounded-lg shadow-md border-2 border-black dark:border-gray-700">
-            <div className="font-bold text-lg mb-3">{columns[selectedColumn].title} ({columns[selectedColumn].tasks.length})</div>
+            <div className="font-bold text-lg mb-3">
+              {columns[selectedColumn].title} (
+              {columns[selectedColumn].tasks.length})
+            </div>
             <div className="space-y-3">
-              {columns[selectedColumn].tasks.map(task => (
+              {columns[selectedColumn].tasks.map((task) => (
                 <div
                   key={task.task_id}
-                  draggable
                   onDragStart={(e) => handleDragStart(e, task)}
                   onClick={() => handleTaskClick(task)}
                   className="bg-white dark:bg-gray-800 p-4 rounded-lg border-3 border-black dark:border-gray-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] cursor-grab"
@@ -481,49 +690,73 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex-1 overflow-hidden">
                       <div className="flex justify-between">
-                        <h3 className="font-semibold text-lg border-b-2 border-black dark:border-gray-600 pb-1">{task.title}</h3>
-                        <button 
+                        <h3 className="font-semibold text-lg border-b-2 border-black dark:border-gray-600 pb-1">
+                          {task.title
+                            ?.toLowerCase()
+                            .split(" ")
+                            .map(
+                              (word) =>
+                                word.charAt(0).toUpperCase() + word.slice(1)
+                            )
+                            .join(" ")}
+                        </h3>
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteTask(task.task_id, task.status);
                           }}
+                          disabled={!canEditTask}
                           className="h-6 w-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-full"
                         >
                           <Trash size={14} />
                         </button>
                       </div>
-                      
+
                       <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                        <p className="text-sm text-gray-700 dark:text-gray-300">{task.description}</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {task.description}
+                        </p>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
                         <div>
-                          <span className="block text-gray-500 dark:text-gray-400">Created</span>
-                          <span className="font-medium">{formatDate(task.created_at)}</span>
+                          <span className="block text-gray-500 dark:text-gray-400">
+                            Created
+                          </span>
+                          <span className="font-medium">
+                            {formatDate(task.created_at)}
+                          </span>
                         </div>
                         {task.deadline && (
                           <div>
-                            <span className="block text-gray-500 dark:text-gray-400">Deadline</span>
-                            <span className="font-medium">{renderDeadline(task)}</span>
+                            <span className="block text-gray-500 dark:text-gray-400">
+                              Deadline
+                            </span>
+                            <span className="font-medium">
+                              {renderDeadline(task)}
+                            </span>
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
                         {task.created_by && (
                           <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1">
                             <span className="mr-1">Created by:</span>
-                            <span className="font-medium">{task.created_by}</span>
+                            <span className="font-medium">
+                              {userEmails[task.created_by]}
+                            </span>
                           </div>
                         )}
-                        
-                        {task.assigned_to && (
+
+                        {task.assigned_to && userEmails[task.assigned_to] && (
                           <div className="flex items-center text-xs">
                             <div className="flex-shrink-0 mr-2">
-                              {renderAvatar(task.assigned_to)}
+                              {renderAvatar(userEmails[task.assigned_to])}
                             </div>
-                            <span className="font-medium">{task.assigned_to}</span>
+                            <span className="font-medium">
+                              {userEmails[task.assigned_to]}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -537,7 +770,7 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
 
         {/* Desktop view with grid layout */}
         <div className="hidden md:grid md:grid-cols-3 gap-4">
-          {columnOrder.map(columnId => (
+          {columnOrder.map((columnId) => (
             <div
               key={columnId}
               className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-lg shadow-md border-2 border-black dark:border-gray-700"
@@ -548,10 +781,9 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                 {columns[columnId].title} ({columns[columnId].tasks.length})
               </div>
               <div className="p-3 h-[calc(100vh-200px)] overflow-y-auto space-y-3">
-                {columns[columnId].tasks.map(task => (
+                {columns[columnId].tasks.map((task) => (
                   <div
                     key={task.task_id}
-                    draggable
                     onDragStart={(e) => handleDragStart(e, task)}
                     onClick={() => handleTaskClick(task)}
                     className="bg-white dark:bg-gray-800 p-4 rounded-lg border-3 border-black dark:border-gray-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] cursor-grab"
@@ -559,49 +791,73 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex-1 overflow-hidden">
                         <div className="flex justify-between">
-                          <h3 className="font-semibold text-lg border-b-2 border-black dark:border-gray-600 pb-1">{task.title}</h3>
-                          <button 
+                          <h3 className="font-semibold text-lg border-b-2 border-black dark:border-gray-600 pb-1">
+                            {task.title
+                              ?.toLowerCase()
+                              .split(" ")
+                              .map(
+                                (word) =>
+                                  word.charAt(0).toUpperCase() + word.slice(1)
+                              )
+                              .join(" ")}
+                          </h3>
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteTask(task.task_id, task.status);
                             }}
+                            disabled={!canEditTask}
                             className="h-6 w-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-full"
                           >
                             <Trash size={14} />
                           </button>
                         </div>
-                        
+
                         <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                          <p className="text-sm text-gray-700 dark:text-gray-300">{task.description}</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">
+                            {task.description}
+                          </p>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
                           <div>
-                            <span className="block text-gray-500 dark:text-gray-400">Created</span>
-                            <span className="font-medium">{formatDate(task.created_at)}</span>
+                            <span className="block text-gray-500 dark:text-gray-400">
+                              Created
+                            </span>
+                            <span className="font-medium">
+                              {formatDate(task.created_at)}
+                            </span>
                           </div>
                           {task.deadline && (
                             <div>
-                              <span className="block text-gray-500 dark:text-gray-400">Deadline</span>
-                              <span className="font-medium">{renderDeadline(task)}</span>
+                              <span className="block text-gray-500 dark:text-gray-400">
+                                Deadline
+                              </span>
+                              <span className="font-medium">
+                                {renderDeadline(task)}
+                              </span>
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
                           {task.created_by && (
                             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1">
                               <span className="mr-1">Created by:</span>
-                              <span className="font-medium">{task.created_by}</span>
+                              <span className="font-medium">
+                                {userEmails[task.created_by]}
+                              </span>
                             </div>
                           )}
-                          
-                          {task.assigned_to && (
+
+                          {task.assigned_to && userEmails[task.assigned_to] && (
                             <div className="flex items-center text-xs">
                               <div className="flex-shrink-0 mr-2">
-                                {renderAvatar(task.assigned_to)}
+                                {renderAvatar(userEmails[task.assigned_to])}
                               </div>
-                              <span className="font-medium">{task.assigned_to}</span>
+                              <span className="font-medium">
+                                {userEmails[task.assigned_to]}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -614,7 +870,7 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
           ))}
         </div>
       </div>
-      
+
       {/* Task detail modal */}
       {isDetailModalOpen && selectedTask && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -624,28 +880,34 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-medium">
-                    TASK-{selectedTask.task_id.split('-')[1]}
+                    TASK-{selectedTask.task_id.split("-")[1]}
                   </span>
-                  {selectedTask.status === 'todo' && (
-                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">To Do</span>
+                  {selectedTask.status === "todo" && (
+                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">
+                      To Do
+                    </span>
                   )}
-                  {selectedTask.status === 'inProgress' && (
-                    <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">In Progress</span>
+                  {selectedTask.status === "inProgress" && (
+                    <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">
+                      In Progress
+                    </span>
                   )}
-                  {selectedTask.status === 'done' && (
-                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-medium">Done</span>
+                  {selectedTask.status === "done" && (
+                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-medium">
+                      Done
+                    </span>
                   )}
                 </div>
                 <h2 className="text-xl font-bold">{selectedTask.title}</h2>
               </div>
-              <button 
+              <button
                 onClick={() => setIsDetailModalOpen(false)}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <X size={20} />
               </button>
             </div>
-            
+
             {/* Main content area */}
             <div className="flex flex-col md:flex-row gap-6">
               {/* Left side - Description */}
@@ -655,73 +917,105 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                   <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
                     <textarea
                       value={editedTask.description || selectedTask.description}
-                      onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
+                      onChange={(e) =>
+                        setEditedTask({
+                          ...editedTask,
+                          description: e.target.value,
+                        })
+                      }
+                      disabled={!canEditTask}
                       className="w-full bg-transparent border-0 focus:ring-0 text-sm text-gray-700 dark:text-gray-300 resize-none min-h-[100px]"
                       placeholder="Add a description..."
                     />
                   </div>
                 </div>
-                
-                {/* Comments section */}
+
                 <div>
                   <h3 className="text-base font-medium mb-2">Comments</h3>
-                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600 mb-2">
-                    {taskComments[selectedTask.task_id]?.length > 0 ? (
-                      <div className="space-y-3">
-                        {taskComments[selectedTask.task_id].map(comment => (
-                          <div key={comment.id} className="border-b border-gray-200 dark:border-gray-600 pb-3">
+
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600 mb-2 h-64 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+                      {taskComments[selectedTask.task_id]?.length > 0 ? (
+                        taskComments[selectedTask.task_id].map((comment) => (
+                          <div
+                            key={comment.id}
+                            className="border-b border-gray-200 dark:border-gray-600 pb-3"
+                          >
                             <div className="flex items-center mb-1">
                               <div className="mr-2">
-                                {renderAvatar(comment.author)}
+                                {renderAvatar(
+                                  userEmails[comment.author] || comment.author
+                                )}
                               </div>
-                              <span className="font-medium text-sm">{comment.author}</span>
-                              <span className="text-xs text-gray-500 ml-2">{formatDate(comment.created_at)}</span>
+                              <span className="font-medium text-sm">
+                                {userEmails[comment.author]}
+                              </span>
+                              <span className="text-xs text-gray-500 ml-2">
+                                {formatTimeAgo(comment.created_at)}
+                              </span>
                             </div>
                             <p className="text-sm">{comment.content}</p>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">No comments yet.</p>
-                    )}
-                  </div>
-                  
-                  {/* Add comment form */}
-                  <div className="flex gap-2">
-                    <div className="flex-shrink-0">
-                      {renderAvatar("Current User")}
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          No comments yet.
+                        </p>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <textarea
-                        placeholder="Add a comment..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
-                        rows={3}
-                      />
-                      <button
-                        onClick={handleCommentSubmit}
-                        disabled={!newComment.trim()}
-                        className="mt-2 px-4 py-1 bg-blue-500 text-white rounded-md text-sm disabled:opacity-50"
-                      >
-                        Comment
-                      </button>
+
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                      {selectedTask.assigned_to === id ? (
+                        <div className="flex gap-2">
+                          <div className="flex-shrink-0">
+                            {renderAvatar((userEmails[id ?? ""] || id) ?? "U")}
+                          </div>
+                          <div className="flex-1">
+                            <textarea
+                              placeholder="Add a comment..."
+                              value={newComment}
+                              onChange={(e) => setNewComment(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm resize-none"
+                              rows={2}
+                            />
+                            <button
+                              onClick={handleCommentSubmit}
+                              disabled={!newComment.trim()}
+                              className="mt-2 px-4 py-1 bg-blue-500 text-white rounded-md text-sm disabled:opacity-50"
+                            >
+                              Comment
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">
+                          Only the assigned user can comment on this task.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
-              
+
               {/* Right sidebar - Details */}
               <div className="md:w-64 space-y-4">
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
                   <h3 className="text-sm font-medium mb-2">Details</h3>
-                  
+
                   <div className="space-y-3">
                     <div>
-                      <span className="block text-xs text-gray-500 dark:text-gray-400">Status</span>
-                      <select 
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">
+                        Status
+                      </span>
+                      <select
                         value={editedTask.status || selectedTask.status}
-                        onChange={(e) => setEditedTask({...editedTask, status: e.target.value})}
+                        disabled={!canEditTask}
+                        onChange={(e) =>
+                          setEditedTask({
+                            ...editedTask,
+                            status: e.target.value,
+                          })
+                        }
                         className="mt-1 block w-full py-1 px-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
                       >
                         <option value="todo">To Do</option>
@@ -729,81 +1023,119 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                         <option value="done">Done</option>
                       </select>
                     </div>
-                    
+
                     <div>
-                      <span className="block text-xs text-gray-500 dark:text-gray-400">Assignee</span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">
+                        Assignee
+                      </span>
                       <div className="flex items-center mt-1">
-                        {selectedTask.assigned_to ? (
+                        {selectedTask.assigned_to &&
+                        userEmails[selectedTask.assigned_to] ? (
                           <>
-                            {renderAvatar(selectedTask.assigned_to)}
-                            <span className="ml-2 text-sm">{selectedTask.assigned_to}</span>
+                            {renderAvatar(userEmails[selectedTask.assigned_to])}
+                            <span className="ml-2 text-sm">
+                              {userEmails[selectedTask.assigned_to]}
+                            </span>
                           </>
                         ) : (
-                          <span className="text-sm text-gray-500">Unassigned</span>
+                          <span className="text-sm text-gray-500">
+                            Unassigned
+                          </span>
                         )}
                       </div>
                     </div>
-                    
+
                     <div>
-                      <span className="block text-xs text-gray-500 dark:text-gray-400">Created</span>
-                      <span className="text-sm">{formatDate(selectedTask.created_at)}</span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">
+                        Created
+                      </span>
+                      <span className="text-sm">
+                        {formatDate(selectedTask.created_at)}
+                      </span>
                     </div>
-                    
+
                     <div>
-                      <span className="block text-xs text-gray-500 dark:text-gray-400">Deadline</span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">
+                        Deadline
+                      </span>
                       <div className="flex items-center space-x-2 mt-1">
                         <div className="flex-1">
-                          <label className="text-xs text-gray-500">Days from now:</label>
-                          <input 
-                            type="number" 
+                          <label className="text-xs text-gray-500">
+                            Days from now:
+                          </label>
+                          <input
+                            type="number"
                             min="0"
-                            value={selectedTask.deadlineDays !== undefined ? Math.max(0, selectedTask.deadlineDays || 0) : ""}
+                            value={
+                              selectedTask.deadlineDays !== undefined
+                                ? Math.max(0, selectedTask.deadlineDays || 0)
+                                : ""
+                            }
                             onChange={(e) => {
                               const days = parseInt(e.target.value);
+                              setDeadlineDays(days ?? 0);
                               if (!isNaN(days)) {
                                 // Calculate new deadline date based on days from now
                                 const date = new Date();
                                 date.setDate(date.getDate() + days);
-                                const newDeadline = date.toISOString().split('T')[0];
+                                const newDeadline = date
+                                  .toISOString()
+                                  .split("T")[0];
                                 setEditedTask({
-                                  ...editedTask, 
+                                  ...editedTask,
                                   deadline: newDeadline,
-                                  deadlineDays: days
+                                  deadlineDays: days,
+                                });
+                                setSelectedTask({
+                                  ...selectedTask,
+                                  deadlineDays: days,
                                 });
                               }
                             }}
+                            disabled={!canEditTask}
                             className="mt-1 block w-full py-1 px-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
                           />
                         </div>
                       </div>
                       {selectedTask.deadline && (
                         <div className="mt-2">
-                          <span className="text-sm font-medium">{formatDate(editedTask.deadline || selectedTask.deadline)}</span>
-                          {renderDeadline({...selectedTask, ...editedTask})}
+                          <span className="text-sm font-medium">
+                            {formatDate(
+                              editedTask.deadline || selectedTask.deadline
+                            )}
+                          </span>
+                          {renderDeadline({ ...selectedTask, ...editedTask })}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Actions */}
                 <div className="space-y-2">
                   <button
+                    disabled={!canEditTask}
                     onClick={handleTaskUpdate}
                     className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-medium transition-colors duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,0.3)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,0.3)] flex items-center justify-center"
                   >
                     Update
                   </button>
-                  
+
                   <button
-                    onClick={() => handleDeleteTask(selectedTask.task_id, selectedTask.status)}
+                    disabled={!canEditTask}
+                    onClick={() =>
+                      handleDeleteTask(
+                        selectedTask.task_id,
+                        selectedTask.status
+                      )
+                    }
                     className="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md font-medium transition-colors duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,0.3)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,0.3)] flex items-center justify-center"
                   >
                     <Trash size={16} className="mr-2" /> Delete
                   </button>
-                  
+
                   <button
-                    onClick={() => setIsDetailModalOpen(false)}
+                    onClick={() => handleCloseDetailModal()}
                     className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 px-4 py-2 rounded-md font-medium transition-colors duration-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_rgba(0,0,0,0.2)]"
                   >
                     Close
@@ -821,14 +1153,14 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-xl w-full border-3 border-black dark:border-gray-700 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.3)]">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Add New Task</h2>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               {/* Title */}
               <div>
@@ -842,10 +1174,12 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                   placeholder="Task title"
                 />
               </div>
-              
+
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium mb-1">
+                  Description
+                </label>
                 <textarea
                   name="description"
                   value={newTask.description}
@@ -855,7 +1189,7 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                   placeholder="Task description"
                 />
               </div>
-              
+
               {/* Status */}
               <div>
                 <label className="block text-sm font-medium mb-1">Status</label>
@@ -870,45 +1204,37 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
                   <option value="done">Done</option>
                 </select>
               </div>
-              
+
               {/* Assigned To */}
               <div>
-                <label className="block text-sm font-medium mb-1">Assigned To</label>
+                <label className="block text-sm font-medium mb-1">
+                  Assigned To
+                </label>
                 <input
                   type="text"
                   name="assigned_to"
-                  value={newTask.assigned_to || ''}
+                  value={newTask.assigned_to || ""}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
                   placeholder="User name"
                 />
               </div>
-              
-              {/* Created By */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Created By</label>
-                <input
-                  type="text"
-                  name="created_by"
-                  value={newTask.created_by || ''}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
-                  placeholder="Your name"
-                />
-              </div>
-              
+
               {/* Deadline */}
               <div>
-                <label className="block text-sm font-medium mb-1">Deadline</label>
+                <label className="block text-sm font-medium mb-1">
+                  Deadline
+                </label>
                 <input
+                  min={"0"}
                   type="date"
                   name="deadline"
-                  value={newTask.deadline || ''}
+                  value={newTask.deadline || ""}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md"
                 />
               </div>
-              
+
               <div className="flex justify-end space-x-2 pt-4">
                 <button
                   onClick={() => setIsModalOpen(false)}
@@ -931,5 +1257,4 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   );
 };
 
-export default Board; 
-
+export default Board;
