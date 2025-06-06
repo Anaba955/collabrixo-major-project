@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
+
 export interface Notification {
   id: string | number;
+
   user: {
     name: string;
     image: string;
@@ -14,6 +16,7 @@ export interface Notification {
   isUnread: boolean;
 }
 
+
 interface NotificationPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,6 +26,7 @@ interface NotificationPanelProps {
 }
 
 const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose, notifications, markAsRead, markAsUnread }) => {
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -36,6 +40,8 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose, 
 
   const [activeTab, setActiveTab] = useState<'unread' | 'read'>('unread');
 
+  
+  
   const unreadCount = notifications.filter(n => n.isUnread).length;
   const readCount = notifications.filter(n => !n.isUnread).length;
 
@@ -133,11 +139,13 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose, 
                 </div>
               </div>
             ))}
+
           {activeTab === 'unread' && unreadCount === 0 && (
             <div className="p-8 text-center text-gray-400">
               <p>No unread notifications</p>
             </div>
           )}
+
           {activeTab === 'read' && readCount === 0 && (
             <div className="p-8 text-center text-gray-400">
               <p>No read notifications</p>

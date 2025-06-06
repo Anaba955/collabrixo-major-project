@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PieChart from "./_components/PieChart";
@@ -13,6 +14,7 @@ import { Settings } from "lucide-react";
 import BarsWithLine from "./_components/BarsWithLines";
 import { Notification } from "./_components/NotificationPanel";
 
+
 // Task data interfaces
 interface TaskCounts {
   total: number;
@@ -20,6 +22,7 @@ interface TaskCounts {
   inProgress: number;
   done: number;
 }
+
 
 type Task = {
   created_at: string;
@@ -34,10 +37,12 @@ type TaskData = {
   totalTasks: number;
 };
 
+
 interface PieChartItem {
   name: string;
   value: number;
 }
+
 
 interface Profile {
   id: string;
@@ -121,11 +126,13 @@ export default function Dashboard() {
     fetchUserProfile();
   }, []);
 
+
   // Fetch task data
   useEffect(() => {
     const fetchTaskData = async () => {
       try {
         setTaskLoading(true);
+
 
         const supabase = createClient();
 
@@ -144,12 +151,14 @@ export default function Dashboard() {
         );
         if (error) throw error;
 
+
         if (data && Array.isArray(data)) {
           // Calculate task counts
           let todo = 0;
           let inProgress = 0;
           let done = 0;
           let total = 0;
+
 
           // Map status data to pie chart format
           const chartData: PieChartItem[] = data.map((item) => {
@@ -173,10 +182,12 @@ export default function Dashboard() {
             };
           });
 
+
           setTaskCounts({
             total,
             todo,
             inProgress,
+
             done,
           });
           setPieChartData(chartData);
@@ -199,19 +210,23 @@ export default function Dashboard() {
     }, 500);
 
     return () => clearTimeout(timer);
+
   }, []);
 
   useEffect(() => {
     // Set initial dimensions
     setDimensions({
       width: window.innerWidth,
+
       height: window.innerHeight,
+
     });
 
     // Update dimensions on window resize
     const handleResize = () => {
       setDimensions({
         width: window.innerWidth,
+
         height: window.innerHeight,
       });
     };
@@ -228,6 +243,7 @@ export default function Dashboard() {
     const startDay = start.getDay(); // Sunday = 0
     return Math.ceil((day + startDay) / 7);
   }
+
 
   function countTasksPerWeekByStatus(tasks: Task[]): TaskData[] {
     const result: Record<
@@ -487,6 +503,7 @@ export default function Dashboard() {
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-black dark:text-white">
               Dashboard
             </h1>
+
             <NotificationButton
               count={unreadCount}
               onClick={() => setShowNotifications(!showNotifications)}
@@ -524,6 +541,7 @@ export default function Dashboard() {
                 alt={profile?.username || "User"}
                 className="w-full h-full object-cover"
               />
+
             </div>
           </div>
         </div>
@@ -531,13 +549,16 @@ export default function Dashboard() {
       <JeemBackground opacity={0.7} blurAmount={120} speed={35} />
 
       {/* Task Summary Row */}
+
       <TaskSummaryCards />
+
 
       {/* Middle Row - Progress Graph and Pie Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-8">
         <Card className="border-2 border-black dark:border-gray-800 bg-white/70 backdrop-blur-lg dark:bg-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all overflow-hidden">
           <CardHeader className="border-b-2 border-black dark:border-gray-800 bg-gradient-to-r from-blue-50/90 to-blue-100/90 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+
               <CardTitle className="font-black text-base sm:text-lg">
                 PROGRESS GRAPH
               </CardTitle>
@@ -562,6 +583,7 @@ export default function Dashboard() {
                   events={true}
                 />
               )}
+
             </div>
           </CardContent>
         </Card>
@@ -569,9 +591,11 @@ export default function Dashboard() {
         <Card className="border-2 border-black dark:border-gray-800 bg-white/70 backdrop-blur-lg dark:bg-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all overflow-hidden">
           <CardHeader className="border-b-2 border-black dark:border-gray-800 bg-gradient-to-r from-purple-50/90 to-indigo-100/90 dark:from-purple-900/20 dark:to-indigo-900/20 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+
               <CardTitle className="font-black text-base sm:text-lg">
                 TASKS OVERVIEW
               </CardTitle>
+
               <div className="px-2 py-1 bg-white/90 dark:bg-gray-800 rounded border-2 border-black dark:border-gray-700 text-xs font-bold">
                 Last updated: Today
               </div>
@@ -579,10 +603,12 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-3">
             <div className="h-64 sm:h-[300px] flex items-center justify-center">
+
               {dimensions.width > 0 && !taskLoading && pieChartData && (
                 <PieChart
                   width={getPieChartWidth()}
                   height={Math.min(getPieChartWidth() * 0.8, 310)}
+
                 />
               )}
               {taskLoading && (
@@ -597,6 +623,7 @@ export default function Dashboard() {
       <Card className="border-2 border-black dark:border-gray-800 bg-white/70 backdrop-blur-lg dark:bg-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all mb-6 overflow-hidden">
         <CardHeader className="border-b-2 border-black dark:border-gray-800 bg-gradient-to-r from-green-50/90 to-emerald-100/90 dark:from-green-900/20 dark:to-emerald-900/20 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+
             <CardTitle className="font-black text-base sm:text-lg">
               MONTHLY ACTIVITY HEATMAP
             </CardTitle>
@@ -604,13 +631,16 @@ export default function Dashboard() {
               <span className="bg-green-200/90 dark:bg-green-800 text-green-800 dark:text-green-200 border border-black dark:border-green-600 px-2 py-1 text-xs rounded font-bold">
                 Projects: All
               </span>
+
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-3 overflow-x-auto">
           <div className="h-64 sm:h-[280px] flex items-center justify-center min-w-[500px]">
             {dimensions.width > 0 && !heatmapLoading && (
+
               <Heatmap width={getHeatmapWidth()} height={240} />
+
             )}
             {heatmapLoading && (
               <div className="animate-spin w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full"></div>

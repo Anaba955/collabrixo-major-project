@@ -1,11 +1,16 @@
 "use client";
+
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Pie from '@visx/shape/lib/shapes/Pie';
 import { scaleOrdinal } from '@visx/scale';
 import { Group } from '@visx/group';
 import { ChevronDown } from 'lucide-react';
+
 import { createClient } from "@/utils/supabase/client";
 import { RealtimeChannel } from '@supabase/supabase-js';
+
 
 export interface PieChartItem {
   name: string;
@@ -35,7 +40,9 @@ const defaultMargin = { top: 50, right: 20, bottom: 20, left: 20 };
 export interface PieChartProps {
   width: number;
   height: number;
+
   initialData?: PieChartItem[];
+
   margin?: typeof defaultMargin;
   colors?: string[];
   innerRadius?: number; 
@@ -46,7 +53,9 @@ export interface PieChartProps {
 export default function PieChart({
   width,
   height,
+
   initialData,
+
   margin = defaultMargin,
   colors = defaultColors,
   innerRadius = 0, 
@@ -54,6 +63,7 @@ export default function PieChart({
   cornerRadius = 3,
 }: PieChartProps) {
   const [viewMode, setViewMode] = useState<'normal' | 'advanced'>('normal');
+
   const [data, setData] = useState<PieChartItem[]>(initialData || []);
   const [isLoading, setIsLoading] = useState(!initialData);
   const [userId, setUserId] = useState<string | null>(null);

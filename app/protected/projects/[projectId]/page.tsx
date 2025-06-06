@@ -1,4 +1,7 @@
+
+// app/protected/projects/Home.tsx
 "use client";
+
 import TabsSection from "../_components/TabsSection";
 
 import JeemBackground from "../../_components/JeemBackground";
@@ -31,6 +34,7 @@ export default function Home() {
       >
         <Video size={32} />
       </button>
+
     </div>
 
   );

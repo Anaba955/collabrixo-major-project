@@ -61,6 +61,7 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   // Reference for keeping track of the next task ID counter
   const supabaseClient = createClient();
 
+
   const pathname = usePathname();
   const pathParts = pathname.split("/");
   const projectId = pathParts[pathParts.length - 1];
@@ -68,6 +69,7 @@ const Board: React.FC<BoardProps> = ({ initialTasks = [] }) => {
   const [userEmails, setUserEmails] = useState<Record<string, string>>({});
 
   // const [assignedId, setAssignedId] = useState<string | null>(null);
+
   // const channels = supabaseClient.channel('custom-all-channel')
   // .on(
   //   'postgres_changes',

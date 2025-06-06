@@ -1,15 +1,20 @@
 "use client";
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Group } from '@visx/group';
 import { scaleLinear } from '@visx/scale';
 import { createClient } from "@/utils/supabase/client";
 import { RealtimeChannel } from '@supabase/supabase-js';
 
+
 // Define the bin type
 export interface HeatmapBin {
   count: number;
   day: string;
+
+
   date: Date;
+
 }
 
 // Define the week data type
@@ -24,10 +29,13 @@ export const background = '#28272c';
 interface HeatmapProps {
   width: number;
   height: number;
+
   initialData?: WeekData[];
+
   events?: boolean;
   margin?: { top: number; right: number; bottom: number; left: number };
 }
+
 
 interface TooltipData {
   x: number;
@@ -227,6 +235,7 @@ function Heatmap({
     };
   }, [fetchHeatmapData]);
   
+
   const colorMax = 9;
   
   const xMax = width - margin.left - margin.right;
@@ -259,6 +268,7 @@ function Heatmap({
   
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   
+
   // Format date to display in tooltip
   const formatDate = (date: Date): string => {
     return date.toLocaleDateString('en-US', {
@@ -469,6 +479,7 @@ function Heatmap({
         )}
       </svg>
     </div>
+
   );
 }
 

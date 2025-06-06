@@ -6,13 +6,16 @@ import {
   Folder,
   Plus,
   X,
+
   Trash2,
   EyeIcon,
   EyeOffIcon,
+
 } from "lucide-react";
 import { useState, useEffect, ChangeEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import { createClient } from "@/utils/supabase/client";
 import { createPortal } from "react-dom";
 
@@ -73,12 +76,14 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
         .select("*")
         .contains("team_members", [userId]);
 
+
       if (error) {
         console.error("Error fetching projects:", error);
       } else {
         setProjects(data);
       }
     };
+
 
     fetchData();
   }, []);
@@ -111,6 +116,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
+
     const { name, value } = e.target;
     setNewProject((prev) => ({ ...prev, [name]: value }));
   };
@@ -123,6 +129,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
 
     const { data, error } = await supabaseClient
       .from("projects")
+
       .insert([
         {
           name: newProject.name,
@@ -131,6 +138,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
           team_members: [id],
         },
       ])
+
       .select()
       .single();
 
@@ -148,6 +156,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
   };
 
   return (
+
     <div className="h-full overflow-y-auto px-2">
       <div className="dark:text-white">
         <Link
@@ -156,6 +165,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
             pathname === "/protected"
               ? "bg-slate-100 font-semibold"
               : "hover:bg-slate-100"
+
           }`}
         >
           <LayoutDashboard className="w-5 h-5 mr-3" />
@@ -178,6 +188,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
 
         <div className="ml-4 mt-2 space-y-1">
           {firstSix.map((project) => (
+
             <div
               key={project.project_id}
               className={`group flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-300 hover:bg-slate-100 ${project.project_id == projectId ? "bg-slate-100 font-semibold" : ""}`}
@@ -239,10 +250,12 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
                   </button>
                 )}
               </div>
+
             ))}
           {remaining.length > 0 && (
             <button
               onClick={() => setShowRemaining(!showRemaining)}
+
               className="flex gap-2 px-4 py-2 text-sm rounded-lg hover:bg-slate-100 text-purple-600 font-medium"
             >
               {showRemaining ? (
@@ -356,6 +369,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
           </div>,
           document.body
         )}
+
     </div>
   );
 }

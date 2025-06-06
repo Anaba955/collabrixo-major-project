@@ -36,9 +36,11 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+
         >
           <main className="min-h-screen flex flex-col">
             <div className="flex-1 w-full flex flex-col gap-20">{children}</div>
+
           </main>
         </ThemeProvider>
       </body>
