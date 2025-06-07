@@ -1,50 +1,79 @@
 
 
-"use client";
+'use client';
 
-import * as React from "react";
-import { DayPicker, DayPickerProps } from "react-day-picker";
-import { cn } from "@/lib/utils";
+import React, { useEffect, useState } from 'react';
+import Calendar from 'react-calendar';
+import { useSearchParams } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
+import 'react-calendar/dist/Calendar.css';
 
-export function Calendar({
-  className,
-  classNames,
-  showOutsideDays = true,
-  onDateSelect,
-  ...props
-}: DayPickerProps & { onDateSelect?: (date: string) => void }) {
-  const handleDayClick = (date: Date) => {
-    const isoDate = date.toISOString().split("T")[0];
-    if (onDateSelect) {
-      onDateSelect(isoDate);
-    }
-  };
+interface Task {
+  task_id: string;
+  title: string;
+  description: string;
+  status: string;
+  created_at: string;
+}
+
+export default function CalendarTasks() {
+  const [date, setDate] = useState<Date | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksForDate, setTasksForDate] = useState<Task[]>([]);
+  const projectId = useSearchParams().get('project_id');
+  const supabase = createClient();
+
+  // Load tasks when projectId changes
+  useEffect(() => {
+    if (!projectId) return;
+
+    const loadTasks = async () => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .in('status', ['todo', 'InProgress', 'done']);
+
+      if (error) {
+        console.error('Fetch error:', error);
+        return;
+      }
+
+      setTasks(data || []);
+    };
+
+    loadTasks();
+  }, [projectId]);
+
+  // Filter tasks by selected date
+  useEffect(() => {
+    if (!date) return;
+
+    const dateStr = date.toISOString().split('T')[0];
+    const filtered = tasks.filter(task => task.created_at.startsWith(dateStr));
+    setTasksForDate(filtered);
+  }, [date, tasks]);
 
   return (
-    <div className={cn("max-w-md mx-auto", className)}>
-      <DayPicker
-        showOutsideDays={showOutsideDays}
-        onDayClick={handleDayClick}
-        className={cn("bg-white rounded-md shadow-md p-4", className)}
-        classNames={{
-          months: "flex flex-col sm:flex-row gap-4",
-          month: "flex flex-col gap-4",
-          caption: "flex justify-center items-center relative text-lg font-semibold pb-2",
-          nav: "flex justify-between items-center mb-2",
-          nav_button: "p-1 opacity-70 hover:opacity-100",
-          table: "w-full border-collapse border border-gray-200 rounded-md",
-          head_row: "flex",
-          head_cell: "flex-1 text-center py-2 font-semibold text-gray-500 text-sm",
-          row: "flex w-full",
-          cell: "flex-1 aspect-square text-center py-1 cursor-pointer select-none rounded-md transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary",
-          day_selected: "bg-primary text-primary-foreground font-semibold",
-          day_today: "border border-primary text-primary font-semibold",
-          day_outside: "text-gray-400",
-          day_disabled: "text-gray-300 cursor-not-allowed",
-          ...classNames,
-        }}
-        {...props}
-      />
+    <div className="p-4">
+      <Calendar onClickDay={setDate} />
+      <h2 className="text-lg mt-4 font-semibold">
+        Tasks on {date ? date.toDateString() : '...'}
+      </h2>
+
+      {tasksForDate.length === 0 ? (
+        <p className="text-gray-500 mt-2">No tasks on this date.</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {tasksForDate.map(task => (
+            <li key={task.task_id} className="border p-3 rounded shadow">
+              <div className="font-medium">{task.title}</div>
+              <div className="text-sm text-blue-600">{task.status}</div>
+              <div className="text-xs text-gray-500">{task.description || 'No description'}</div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

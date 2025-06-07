@@ -76,7 +76,7 @@ export default function ProjectCalendarPage({ projectId }: { projectId: string }
 
   const grouped = {
     todo: tasks.filter((t) => t.status === "todo"),
-    "in progress": tasks.filter((t) => t.status === "in progress"),
+    "inProgress": tasks.filter((t) => t.status === "inProgress"),
     done: tasks.filter((t) => t.status === "done"),
   };
 
@@ -84,7 +84,7 @@ export default function ProjectCalendarPage({ projectId }: { projectId: string }
     switch (status) {
       case "todo":
         return <Circle className="w-4 h-4 text-gray-400" />;
-      case "in progress":
+      case "inProgress":
         return <Clock className="w-4 h-4 text-blue-500" />;
       case "done":
         return <CheckCircle className="w-4 h-4 text-green-500" />;
@@ -97,7 +97,7 @@ export default function ProjectCalendarPage({ projectId }: { projectId: string }
     switch (status) {
       case "todo":
         return "border-l-gray-300 bg-gray-50";
-      case "in progress":
+      case "inProgress":
         return "border-l-blue-300 bg-blue-50";
       case "done":
         return "border-l-green-300 bg-green-50";

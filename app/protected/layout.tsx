@@ -1,7 +1,3 @@
-
-
-
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,6 +8,7 @@ import Link from "next/link";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { createClient } from "@/utils/supabase/client";
 import SimpleTooltip from "@/components/team_view";
+import toast from "react-hot-toast";
 
 type TeamMember = {
   id: string;
@@ -19,30 +16,26 @@ type TeamMember = {
   designation: string;
 };
 
-export default function Layout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const params = useParams();
 
   const projectIdFromUrl = params?.projectId;
 
-//   const toggleSidebar = () => setIsCollapsed((prev) => !prev);
-   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
+  const toggleSidebar = () => {
+    setIsCollapsed((prev) => !prev);
   };
-    
+
   useEffect(() => {
     if (!projectIdFromUrl) {
-      console.warn("No project ID in URL.");
+      console.warn("⚠️ No project ID in URL.");
       return;
     }
 
     const fetchTeamMembers = async () => {
       const supabase = createClient();
+      console.log("🔍 Fetching team members for project:", projectIdFromUrl);
 
       try {
         const { data: project, error: projectError } = await supabase
@@ -52,21 +45,25 @@ export default function Layout({
           .maybeSingle();
 
         if (projectError) {
-          console.error("Error fetching project:", projectError.message);
+          console.error("❌ Error fetching project:", projectError.message);
           setTeamMembers([]);
           return;
         }
 
         if (!project) {
-          console.warn("No project found with ID:", projectIdFromUrl);
+          console.warn("⚠️ No project found with ID:", projectIdFromUrl);
           setTeamMembers([]);
           return;
         }
 
-        const teamMemberIds: string[] = project.team_members ?? [];
+        const teamMemberIds: string[] = Array.isArray(project.team_members)
+          ? project.team_members
+          : [];
 
-        if (!Array.isArray(teamMemberIds) || teamMemberIds.length === 0) {
-          console.warn("No team members found.");
+        console.log("📦 Raw team_members:", teamMemberIds);
+
+        if (teamMemberIds.length === 0) {
+          console.warn("⚠️ No team members found.");
           setTeamMembers([]);
           return;
         }
@@ -77,7 +74,7 @@ export default function Layout({
           .in("id", teamMemberIds);
 
         if (profilesError) {
-          console.error("Error fetching profiles:", profilesError.message);
+          console.error("❌ Error fetching profiles:", profilesError.message);
           setTeamMembers([]);
           return;
         }
@@ -88,9 +85,10 @@ export default function Layout({
           designation: "Team Member",
         }));
 
+        console.log("✅ Mapped team members:", membersArray);
         setTeamMembers(membersArray);
       } catch (err) {
-        console.error("Unexpected error:", err);
+        console.error("❌ Unexpected error fetching team members:", err);
         setTeamMembers([]);
       }
     };
@@ -100,6 +98,7 @@ export default function Layout({
 
   return (
     <div className="flex min-h-screen w-full flex-col">
+      {/* Top navbar */}
       <nav className="h-16 bg-white shadow-sm w-full sticky top-0 z-10 flex items-center mb-4 px-4">
         <div className="flex items-center gap-4">
           <button
@@ -114,14 +113,14 @@ export default function Layout({
         </div>
 
         <div className="ml-auto flex items-center gap-4">
-          {teamMembers.length > 0 && (
-            <SimpleTooltip
-              items={teamMembers}
-              onAddMember={() => {
-                alert("Add member clicked!");
-              }}
-            />
-          )}
+          <SimpleTooltip
+            items={teamMembers}
+            projectId={String(projectIdFromUrl)}
+            onAddMember={() => {
+              console.log("🔄 Re-fetching members after add...");
+              setTimeout(() => window.location.reload(), 300);
+            }}
+          />
 
           <ThemeSwitcher />
           <Link
@@ -134,42 +133,20 @@ export default function Layout({
         </div>
       </nav>
 
+      {/* Sidebar + Content */}
       <div className="flex flex-1">
         <div
-          className={`$${
+          className={`${
             isCollapsed ? "w-56 md:w-60 lg:w-72" : "w-0"
           } shadow-lg transition-all duration-300 overflow-hidden h-[calc(100vh-4rem)] sticky top-16`}
         >
           <Sidebar isCollapsed={isCollapsed} toggleSidebar={toggleSidebar} />
         </div>
 
-        <main className="flex-1 px-4 transition-all duration-300">{children}</main>
-      </div> 
-      
-
-
-    {/*anaba*/}  
- 
-    {/* <div className="relative flex-1">
-      {isCollapsed && (
-        <>
-         
-          <div
-            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-20"
-            onClick={toggleSidebar}
-          />
-          <div className="fixed top-16 left-0 w-64 h-[calc(100vh-4rem)] bg-white shadow-lg z-30">
-            <Sidebar isCollapsed={isCollapsed} />
-          </div>
-        </>
-      )}
-
-     
-      <div className="relative z-10">
-        {children}
+        <main className="flex-1 px-4 transition-all duration-300">
+          {children}
+        </main>
       </div>
-    </div>
-       */}
     </div>
   );
 }

@@ -5,15 +5,23 @@
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { Github, LayoutDashboard, MessageSquare, CalendarDays } from "lucide-react";
+import { Github, LayoutDashboard, MessageSquare, CalendarDays, Calendar as CalendarIcon } from "lucide-react";
 import BoardContent from "./ui/BoardContent";
 import { useParams } from "next/navigation";
 import TeamChat from "@/components/Tchat";
 import ProjectCalendarPage from "@/components/ProjectCalendarPage";
 import { createClient } from "@/utils/supabase/client"; // Updated import
 import { User } from "@supabase/supabase-js";
+import Calendar from "@/components/calendar";
 
 import GithubActivity from "./GithubActivity";
+
+
+// import React from "react";
+
+interface BoardContent {
+  profile: any;
+}
 
 
 export default function TabsSection() {
@@ -103,6 +111,10 @@ export default function TabsSection() {
 
     async function fetchProfile() {
       try {
+        if (!currentUser) {
+          console.warn("⚠️ No current user found when fetching profile.");
+          return;
+        }
         console.log("🔍 Fetching profile for user:", currentUser.id);
         
         const { data: profileData, error: profileError } = await supabase
@@ -149,7 +161,7 @@ export default function TabsSection() {
       setError(null);
 
       try {
-        console.log("🔍 Checking access for user:", currentUser.id, "project:", projectId);
+        console.log("🔍 Checking access for user:", currentUser ? currentUser.id : "null", "project:", projectId);
         
         const { data, error: accessError } = await supabase
           .from("projects")
@@ -175,11 +187,11 @@ export default function TabsSection() {
 
         // Check if user is in team_members array
         const isTeamMember = Array.isArray(data.team_members) && 
-                            data.team_members.includes(currentUser.id);
+                            data.team_members.includes(currentUser?.id);
         const hasProjectAccess = isTeamMember;
 
         console.log("🔍 Access check results:", {
-          userId: currentUser.id,
+          userId: currentUser?.id,
           isTeamMember,
           hasProjectAccess,
           teamMembers: data.team_members
@@ -289,7 +301,7 @@ export default function TabsSection() {
           </TabsTrigger>
 
           <TabsTrigger value="calendar" className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-purple-600" />
+            <CalendarIcon className="w-4 h-4 text-purple-600" />
             <span className="text-purple-600">Calendar</span>
           </TabsTrigger>
 
