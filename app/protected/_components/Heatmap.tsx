@@ -160,8 +160,8 @@ function Heatmap({
       return;
     }
     
-    // this is the realtime channel for the heatmap, hope this works :)
-    let realtimeChannel: RealtimeChannel;
+    let realtimeChannel: RealtimeChannel | null = null;
+    let isMounted = true;
     
     const setupRealtimeAndFetchInitial = async () => {
       try {
@@ -174,13 +174,18 @@ function Heatmap({
           return;
         }
         
+        if (!isMounted) return;
+        
         setUserId(user.id);
         
         await fetchHeatmapData(user.id);
         
-        // again the * was not working :(, so I did it this way
+        if (!isMounted) return;
+        
+        // Set up realtime subscription with unique channel name
+        const channelName = `heatmap-tasks-changes-${user.id}-${Date.now()}`;
         realtimeChannel = supabase
-          .channel('heatmap-tasks-changes')
+          .channel(channelName)
           .on('postgres_changes', 
             { 
               event: 'INSERT', 
@@ -189,8 +194,10 @@ function Heatmap({
               filter: `assigned_to=eq.${user.id}`
             }, 
             (payload) => {
-              console.log('Task inserted (heatmap):', payload);
-              fetchHeatmapData(user.id);
+              if (isMounted) {
+                console.log('Task inserted (heatmap):', payload);
+                fetchHeatmapData(user.id);
+              }
             }
           )
           .on('postgres_changes',
@@ -200,8 +207,10 @@ function Heatmap({
               table: 'tasks'
             },
             (payload) => {
-              console.log('Task updated (heatmap):', payload);
-              fetchHeatmapData(user.id);
+              if (isMounted) {
+                console.log('Task updated (heatmap):', payload);
+                fetchHeatmapData(user.id);
+              }
             }
           )
           .on('postgres_changes',
@@ -211,26 +220,37 @@ function Heatmap({
               table: 'tasks'
             },
             (payload) => {
-              console.log('Task deleted (heatmap):', payload);
-              fetchHeatmapData(user.id);
+              if (isMounted) {
+                console.log('Task deleted (heatmap):', payload);
+                fetchHeatmapData(user.id);
+              }
             }
           )
           .subscribe((status) => {
-            console.log('Heatmap realtime subscription status:', status);
+            if (isMounted) {
+              console.log('Heatmap realtime subscription status:', status);
+            }
           });
         
       } catch (error) {
         console.error('Error setting up heatmap realtime:', error);
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
     
     setupRealtimeAndFetchInitial();
     
     return () => {
-      const supabase = createClient();
+      isMounted = false;
       if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
+        const supabase = createClient();
+        supabase.removeChannel(realtimeChannel).then(() => {
+          console.log('Heatmap channel cleaned up');
+        }).catch((error) => {
+          console.warn('Error cleaning up Heatmap channel:', error);
+        });
       }
     };
   }, [fetchHeatmapData]);
@@ -483,4 +503,4 @@ function Heatmap({
   );
 }
 
-export default Heatmap; 
+export default Heatmap;

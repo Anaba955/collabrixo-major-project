@@ -118,7 +118,8 @@ export default function PieChart({
       return;
     }
     
-    let realtimeChannel: RealtimeChannel;
+    let realtimeChannel: RealtimeChannel | null = null;
+    let isMounted = true;
     
     const setupRealtimeAndFetchInitial = async () => {
       try {
@@ -132,14 +133,19 @@ export default function PieChart({
           return;
         }
         
+        if (!isMounted) return;
+        
         setUserId(user.id);
         
         // Initial data fetch
         await fetchChartData(user.id);
         
-        // Set up realtime subscription and I separated events coz * wasn't working will check later if possible 
+        if (!isMounted) return;
+        
+        // Set up realtime subscription with unique channel name
+        const channelName = `pie-chart-tasks-changes-${user.id}-${Date.now()}`;
         realtimeChannel = supabase
-          .channel('pie-chart-tasks-changes')
+          .channel(channelName)
           .on('postgres_changes', 
             { 
               event: 'INSERT', 
@@ -148,8 +154,10 @@ export default function PieChart({
               filter: `assigned_to=eq.${user.id}`
             }, 
             (payload) => {
-              console.log('Task inserted (pie chart):', payload);
-              fetchChartData(user.id);
+              if (isMounted) {
+                console.log('Task inserted (pie chart):', payload);
+                fetchChartData(user.id);
+              }
             }
           )
           .on('postgres_changes',
@@ -159,8 +167,10 @@ export default function PieChart({
               table: 'tasks'
             },
             (payload) => {
-              console.log('Task updated (pie chart):', payload);
-              fetchChartData(user.id);
+              if (isMounted) {
+                console.log('Task updated (pie chart):', payload);
+                fetchChartData(user.id);
+              }
             }
           )
           .on('postgres_changes',
@@ -170,17 +180,23 @@ export default function PieChart({
               table: 'tasks'
             },
             (payload) => {
-              console.log('Task deleted (pie chart):', payload);
-              fetchChartData(user.id);
+              if (isMounted) {
+                console.log('Task deleted (pie chart):', payload);
+                fetchChartData(user.id);
+              }
             }
           )
           .subscribe((status) => {
-            console.log('Pie chart realtime subscription status:', status);
+            if (isMounted) {
+              console.log('Pie chart realtime subscription status:', status);
+            }
           });
         
       } catch (error) {
         console.error('Error setting up pie chart realtime:', error);
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
     
@@ -188,9 +204,14 @@ export default function PieChart({
     
     // Cleanup function
     return () => {
-      const supabase = createClient();
+      isMounted = false;
       if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
+        const supabase = createClient();
+        supabase.removeChannel(realtimeChannel).then(() => {
+          console.log('PieChart channel cleaned up');
+        }).catch((error) => {
+          console.warn('Error cleaning up PieChart channel:', error);
+        });
       }
     };
   }, [fetchChartData]);
@@ -464,4 +485,4 @@ export default function PieChart({
       </svg>
     </div>
   );
-} 
+}

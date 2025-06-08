@@ -189,7 +189,8 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
       return;
     }
     
-    let realtimeChannel: RealtimeChannel;
+    let realtimeChannel: RealtimeChannel | null = null;
+    let isMounted = true;
     
     const setupRealtimeAndFetchInitial = async () => {
       try {
@@ -203,14 +204,19 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
           return;
         }
         
+        if (!isMounted) return;
+        
         setUserId(user.id);
         
         // Initial calculation
         await calculateTaskMetrics(user.id);
         
-        // Set up realtime subscription
+        if (!isMounted) return;
+        
+        // Set up realtime subscription with unique channel name
+        const channelName = `tasks-changes-${user.id}-${Date.now()}`;
         realtimeChannel = supabase
-          .channel('tasks-changes')
+          .channel(channelName)
           .on('postgres_changes', 
             { 
               event: 'INSERT', 
@@ -219,8 +225,10 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
               filter: `assigned_to=eq.${user.id}`
             }, 
             (payload) => {
-              console.log('Task inserted:', payload);
-              calculateTaskMetrics(user.id);
+              if (isMounted) {
+                console.log('Task inserted:', payload);
+                calculateTaskMetrics(user.id);
+              }
             }
           )
           .on('postgres_changes',
@@ -230,8 +238,10 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
               table: 'tasks'
             },
             (payload) => {
-              console.log('Task updated:', payload);
-              calculateTaskMetrics(user.id);
+              if (isMounted) {
+                console.log('Task updated:', payload);
+                calculateTaskMetrics(user.id);
+              }
             }
           )
           .on('postgres_changes',
@@ -241,17 +251,23 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
               table: 'tasks'
             },
             (payload) => {
-              console.log('Task deleted:', payload);
-              calculateTaskMetrics(user.id);
+              if (isMounted) {
+                console.log('Task deleted:', payload);
+                calculateTaskMetrics(user.id);
+              }
             }
           )
           .subscribe((status) => {
-            console.log('Realtime subscription status:', status);
+            if (isMounted) {
+              console.log('Realtime subscription status:', status);
+            }
           });
         
       } catch (error) {
         console.error('Error setting up realtime:', error);
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
     
@@ -259,9 +275,14 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
     
     // Cleanup function
     return () => {
-      const supabase = createClient();
+      isMounted = false;
       if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
+        const supabase = createClient();
+        supabase.removeChannel(realtimeChannel).then(() => {
+          console.log('TaskSummaryCards channel cleaned up');
+        }).catch((error) => {
+          console.warn('Error cleaning up TaskSummaryCards channel:', error);
+        });
       }
     };
   }, [initialTaskCounts, calculateTaskMetrics]);
@@ -395,4 +416,4 @@ export default function TaskSummaryCards({ initialTaskCounts = null }: { initial
       </Card>
     </div>
   );
-} 
+}
